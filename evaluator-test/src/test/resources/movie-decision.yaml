@@ -1,0 +1,25 @@
+tests:
+  - decision: GenreDecision
+    description: "Should return 'Comedy' when preferredGenre is 'comedy'"
+    in:
+      preferredGenre: "comedy"
+    out: "Comedy"
+
+  - decision: GenreDecision
+    description: "Should return 'Drama' for any genre except 'action' or 'comedy'"
+    in:
+      preferredGenre: "any string"
+    out: "Drama"
+
+  - decision: MovieDecision
+    description: "Should recommend 'Action Thriller' for action genre and user age 21"
+    in:
+      preferredGenre: "action"
+      userAge: 21
+    out: "Action Thriller"
+
+  - decision: DrinkDecision
+    description: "Should recommend 'Juice' for user age 16 in DrinkDecision"
+    in:
+      userAge: 16
+    out: "Juice"

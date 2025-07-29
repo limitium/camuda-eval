@@ -1,0 +1,16 @@
+plugins {
+    id 'java'
+}
+
+dependencies {
+    testImplementation project(':evaluator')
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.yaml:snakeyaml:2.2'
+    testImplementation 'org.camunda.bpm.dmn:camunda-engine-dmn:7.23.0'
+    testImplementation 'org.camunda.bpm.model:camunda-dmn-model:7.23.0'
+}
+
+test {
+    useJUnitPlatform()
+}

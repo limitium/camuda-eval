@@ -1,0 +1,4 @@
+rootProject.name = 'camunda-eval'
+include 'evaluator'
+include 'evaluator-test'
+

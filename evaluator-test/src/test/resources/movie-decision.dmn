@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions id="MovieDecisions" name="Movie Decision Definitions"
+  namespace="http://camunda.org/schema/1.0/dmn"
+  xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+  xmlns:feel="https://www.omg.org/spec/DMN/20191111/FEEL/"
+  xmlns:camunda="http://camunda.org/schema/1.0/dmn">
+
+  <!-- Decision Table 1: Genre Recommendation -->
+  <decision id="GenreDecision" name="Genre Recommendation">
+    <decisionTable id="GenreDecisionTable" hitPolicy="UNIQUE">
+      <input id="Input_preferredGenre" label="Preferred Genre">
+        <inputExpression id="InputExpression_preferredGenre" typeRef="string">
+          <text>preferredGenre</text>
+        </inputExpression>
+      </input>
+      <output id="Output_genreRecommendation" label="Genre Recommendation" name="genreRecommendation" typeRef="string"/>
+      <rule id="Rule1_Genre_Action">
+        <inputEntry id="InputEntry_1"><text>"action"</text></inputEntry>
+        <outputEntry id="OutputEntry_1"><text>"Action"</text></outputEntry>
+      </rule>
+      <rule id="Rule2_Genre_Comedy">
+        <inputEntry id="InputEntry_2"><text>"comedy"</text></inputEntry>
+        <outputEntry id="OutputEntry_2"><text>"Comedy"</text></outputEntry>
+      </rule>
+      <rule id="Rule3_Genre_Default">
+        <inputEntry id="InputEntry_3"><text>not("action","comedy")</text></inputEntry>
+        <outputEntry id="OutputEntry_3"><text>"Drama"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+  <!-- Decision Table 2: Movie Recommendation -->
+  <decision id="MovieDecision" name="Movie Recommendation">
+    <informationRequirement>
+      <requiredInput href="#Input_userAge_Movie"/>
+    </informationRequirement>
+    <informationRequirement>
+      <requiredDecision href="#GenreDecision"/>
+    </informationRequirement>
+
+    <decisionTable id="MovieDecisionTable" hitPolicy="FIRST">
+      <input id="Input_userAge_Movie" label="User Age">
+        <inputExpression id="InputExpression_userAge_Movie" typeRef="number">
+          <text>userAge</text>
+        </inputExpression>
+      </input>
+      <input id="Input_genreRecommendation" label="Genre Recommendation">
+        <inputExpression id="InputExpression_genreRecommendation" typeRef="string">
+          <text>genreRecommendation</text>
+        </inputExpression>
+      </input>
+      <output id="Output_movieRecommendation" label="Movie Recommendation" name="movieRecommendation" typeRef="string"/>
+      <rule id="Rule4_Movie_AdultAction">
+        <inputEntry id="InputEntry_4"><text>userAge &gt;= 18</text></inputEntry>
+        <inputEntry id="InputEntry_5"><text>genreRecommendation = "Action"</text></inputEntry>
+        <outputEntry id="OutputEntry_4"><text>"Action Thriller"</text></outputEntry>
+      </rule>
+      <rule id="Rule5_Movie_ComedyAnyAge">
+        <inputEntry id="InputEntry_6"><text>-</text></inputEntry>
+        <inputEntry id="InputEntry_7"><text>genreRecommendation = "Comedy"</text></inputEntry>
+        <outputEntry id="OutputEntry_5"><text>"Comedy Night"</text></outputEntry>
+      </rule>
+      <rule id="Rule6_Movie_Default">
+        <inputEntry id="InputEntry_8"><text>-</text></inputEntry>
+        <inputEntry id="InputEntry_9"><text>-</text></inputEntry>
+        <outputEntry id="OutputEntry_6"><text>"Family Feature"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+  <!-- Decision Table 3: Drink Recommendation -->
+  <decision id="DrinkDecision" name="Drink Recommendation">
+    <informationRequirement>
+      <requiredInput href="#Input_userAge_Drink"/>
+    </informationRequirement>
+
+    <decisionTable id="DrinkDecisionTable" hitPolicy="FIRST">
+      <!-- Renamed IDs here to avoid clash -->
+      <input id="Input_userAge_Drink" label="User Age">
+        <inputExpression id="InputExpression_userAge_Drink" typeRef="number">
+          <text>userAge</text>
+        </inputExpression>
+      </input>
+      <output id="Output_drinkRecommendation" label="Drink Recommendation" name="drinkRecommendation" typeRef="string"/>
+
+      <rule id="Rule7_Drink_Adult">
+        <inputEntry id="InputEntry_10"><text>userAge &gt;= 21</text></inputEntry>
+        <outputEntry id="OutputEntry_7"><text>"Beer"</text></outputEntry>
+      </rule>
+      <rule id="Rule8_Drink_YoungAdult">
+        <inputEntry id="InputEntry_11"><text>userAge &gt;= 18</text></inputEntry>
+        <outputEntry id="OutputEntry_8"><text>"Wine"</text></outputEntry>
+      </rule>
+      <rule id="Rule9_Drink_Underage">
+        <inputEntry id="InputEntry_12"><text>userAge &lt; 18</text></inputEntry>
+        <outputEntry id="OutputEntry_9"><text>"Juice"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+</definitions>

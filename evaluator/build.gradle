@@ -1,0 +1,9 @@
+plugins {
+    id 'java'
+}
+
+dependencies {
+    implementation 'org.camunda.bpm.dmn:camunda-engine-dmn:7.23.0'
+    implementation 'org.camunda.bpm.model:camunda-dmn-model:7.23.0'
+    implementation 'org.yaml:snakeyaml:2.2'
+}
