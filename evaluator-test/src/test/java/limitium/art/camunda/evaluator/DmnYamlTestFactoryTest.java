@@ -1,47 +1,25 @@
 package limitium.art.camunda.evaluator;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
-import org.camunda.bpm.engine.variable.Variables;
+import limitium.art.camunda.evaluator.junit.DmnYamlTestFactory;
+import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.TestFactory;
 
-import static org.junit.jupiter.api.Assertions.*;
-import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.stream.Stream;
 
-public class DnmYamlTestErrors {
-    @Test
-    void testMissingDmnFile() {
-        DmnEvaluator evaluator = new DmnEvaluator();
-        assertThrows(DmnEvaluator.DmnFileNotFoundException.class, () -> evaluator.loadAllDecisionKeys(Path.of("src/test/resources/no-such-file.dmn")));
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+public class DmnYamlTestFactoryTest {
+    @TestFactory
+    Stream<DynamicTest> dmnTests() throws Exception {
+        Stream<DynamicTest> testStream = DmnYamlTestFactory.from(
+                Paths.get("src/test/resources"),
+                Paths.get("src/test/resources"));
+
+        List<DynamicTest> testStreamList = testStream.toList();
+        assertEquals(4, testStreamList.size(), "Should be 4 dynamic tests");
+
+        return testStreamList.stream();
     }
-
-    @Test
-    void testMissingDecision() {
-        DmnEvaluator evaluator = new DmnEvaluator();
-        assertThrows(DmnEvaluator.DmnDecisionNotFoundException.class, () -> evaluator.loadAllRules(Path.of("src/test/resources/movie-decision.dmn"), "NoSuchDecision"));
-    }
-
-    @Test
-    void testMissingRule() {
-        DmnEvaluator evaluator = new DmnEvaluator();
-        // Use a real DMN file with a decision that exists but has no rules
-        // We'll use a custom DMN file for this test: /empty-decision.dmn with decision id 'EmptyDecision'
-        assertThrows(DmnEvaluator.DmnRuleNotFoundException.class, () -> evaluator.loadAllRules(Path.of("src/test/resources/empty-decision.dmn"), "EmptyDecision"));
-    }
-
-    @Test
-    void testAmbiguousEvaluation() {
-        DmnEvaluator evaluator = new DmnEvaluator();
-        DmnEvaluator.DmnDecisionEvaluator dec = evaluator.loadRule(Path.of("src/test/resources/ambiguous-decision.dmn"), "AmbiguousDecision");
-        // Provide variables that do not match any rule (e.g., value = "bar")
-        var vars = Variables.createVariables().putValue("value", "bar");
-        assertThrows(DmnEvaluator.DmnAmbiguousEvaluationException.class, () -> dec.evaluate(vars));
-    }
-
-    @Test
-    void testGenericEvaluationError() {
-        DmnEvaluator evaluator = new DmnEvaluator();
-        // Simulate error by passing null as variables
-        DmnEvaluator.DmnDecisionEvaluator dec = evaluator.loadRule(Path.of("src/test/resources/movie-decision.dmn"), "MovieDecision");
-        assertThrows(DmnEvaluator.DmnEvaluationException.class, () -> dec.evaluate(null));
-    }
-} 
+}

@@ -51,7 +51,7 @@ public class DmnEvaluator {
         }
     }
 
-    static class DmnDecisionEvaluator {
+    public static class DmnDecisionEvaluator {
         private final DmnDecision dmnDecision;
         private final DmnEvaluator dmnEvaluator;
 
