@@ -120,7 +120,7 @@ public final class DmnYamlTestFactory {
                                 evaluator.setCollectCoverage(true);
                                 DmnEvaluator.DmnDecisionEvaluator dec = evaluator.loadRule(dmnPath, tc.decisionKey);
 
-                                var vars = Variables.createVariables();
+                                org.camunda.bpm.engine.variable.VariableMap vars = Variables.createVariables();
                                 tc.inputs.forEach(vars::putValue);
 
                                 String actual = dec.evaluate(vars)
@@ -176,7 +176,7 @@ public final class DmnYamlTestFactory {
 
     private static String buildDisplayName(String baseName, TestCase tc) {
         StringBuilder sb = new StringBuilder();
-        if (!tc.description.isBlank()) {
+        if (tc.description != null && !tc.description.trim().isEmpty()) {
             sb.append(tc.description).append(" | ");
         }
         sb.append(baseName)
@@ -201,16 +201,32 @@ public final class DmnYamlTestFactory {
     // Internal value objects
     // ────────────────────────────────────────────────────────────────────────────────
 
-    private record TestCase(String decisionKey,
-                            Map<String, Object> inputs,
-                            String expected,
-                            String description) {
+    private static final class TestCase {
+        final String decisionKey;
+        final Map<String, Object> inputs;
+        final String expected;
+        final String description;
+
+        TestCase(String decisionKey, Map<String, Object> inputs, String expected, String description) {
+            this.decisionKey = decisionKey;
+            this.inputs = inputs;
+            this.expected = expected;
+            this.description = description;
+        }
+
+        @SuppressWarnings("unchecked")
         static TestCase from(Map<String, Object> map) {
             String decision = Objects.requireNonNull((String) map.get("decision"), "decision key missing");
-            @SuppressWarnings("unchecked")
-            Map<String, Object> in = (Map<String, Object>) map.getOrDefault("in", Map.of());
+            Map<String, Object> in;
+            Object inObj = map.get("in");
+            if (inObj instanceof Map) {
+                in = (Map<String, Object>) inObj;
+            } else {
+                in = Collections.emptyMap();
+            }
             String out = Objects.requireNonNull((String) map.get("out"), "expected 'out' missing");
-            String desc = (String) map.getOrDefault("description", "");
+            String desc = (String) map.get("description");
+            if (desc == null) desc = "";
             return new TestCase(decision, in, out, desc);
         }
     }

@@ -25,6 +25,9 @@ import java.util.Collection;
 import java.nio.file.Path;
 import java.nio.file.Files;
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 public class DmnEvaluator {
     private final DnmEvaluationEvenCollector listener;
@@ -66,7 +69,7 @@ public class DmnEvaluator {
             try {
                 dmnEvaluator.listener.clearEvents();
                 DmnDecisionResult dmnDecisionResultEntries = dmnEvaluator.dmnEngine.evaluateDecision(dmnDecision, vars);
-                List<DmnDecisionTableEvaluationEvent> events = List.copyOf(dmnEvaluator.listener.getEvents());
+                List<DmnDecisionTableEvaluationEvent> events = new ArrayList<>(dmnEvaluator.listener.getEvents());
                 dmnEvaluator.listener.clearEvents();
                 if (events.isEmpty()) {
                     throw new DmnAmbiguousEvaluationException("No evaluation events for decision: " + dmnDecision.getKey());
@@ -138,7 +141,7 @@ public class DmnEvaluator {
         listener = new DnmEvaluationEvenCollector();
         dmnEngine = org.camunda.bpm.dmn.engine.impl.DefaultDmnEngineConfiguration
                 .createDefaultDmnEngineConfiguration()
-                .customPostDecisionTableEvaluationListeners(List.of(listener))
+                .customPostDecisionTableEvaluationListeners(Arrays.asList(listener))
                 .buildEngine();
     }
 
@@ -193,6 +196,43 @@ public class DmnEvaluator {
         } catch (IOException e) {
             throw new DmnFileNotFoundException(dmnFilePath.toString());
         }
+    }
+
+    // String-based DMN consumption APIs
+    public DmnDecisionEvaluator loadRuleFromString(String dmnXmlContent, String ruleId) {
+        ByteArrayInputStream is = new ByteArrayInputStream(dmnXmlContent.getBytes(StandardCharsets.UTF_8));
+        DmnDecision dmnDecision = dmnEngine.parseDecision(ruleId, is);
+        return new DmnDecisionEvaluator(dmnDecision, this);
+    }
+
+    public List<String> loadAllDecisionKeysFromString(String dmnXmlContent) {
+        ByteArrayInputStream is = new ByteArrayInputStream(dmnXmlContent.getBytes(StandardCharsets.UTF_8));
+        DmnModelInstance modelInstance = Dmn.readModelFromStream(is);
+        List<String> decisionKeys = new ArrayList<>();
+        for (Decision decision : modelInstance.getModelElementsByType(Decision.class)) {
+            decisionKeys.add(decision.getId());
+        }
+        return decisionKeys;
+    }
+
+    public List<RuleInfo> loadAllRulesFromString(String dmnXmlContent, String decisionKey) {
+        ByteArrayInputStream is = new ByteArrayInputStream(dmnXmlContent.getBytes(StandardCharsets.UTF_8));
+        DmnModelInstance modelInstance = Dmn.readModelFromStream(is);
+        Decision decision = modelInstance.getModelElementById(decisionKey);
+        if (decision == null) throw new DmnDecisionNotFoundException(decisionKey, "<string>");
+        Collection<DecisionTable> tables = decision.getChildElementsByType(DecisionTable.class);
+        if (tables.isEmpty()) throw new DmnRuleNotFoundException("<any>", decisionKey, "<string>");
+        DecisionTable table = tables.iterator().next();
+        if (table.getRules().isEmpty()) throw new DmnRuleNotFoundException("<none>", decisionKey, "<string>");
+        List<RuleInfo> rules = new ArrayList<>();
+        for (Rule rule : table.getRules()) {
+            List<String> inputEntries = new ArrayList<>();
+            rule.getInputEntries().forEach(e -> inputEntries.add(e.getTextContent()));
+            List<String> outputEntries = new ArrayList<>();
+            rule.getOutputEntries().forEach(e -> outputEntries.add(e.getTextContent()));
+            rules.add(new RuleInfo(rule.getId(), inputEntries, outputEntries));
+        }
+        return rules;
     }
 
     // Coverage event structure

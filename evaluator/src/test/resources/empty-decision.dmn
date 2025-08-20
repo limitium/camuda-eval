@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions id="EmptyDecisionDef" name="Empty Decision Definitions"
+  namespace="http://camunda.org/schema/1.0/dmn"
+  xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+  xmlns:feel="https://www.omg.org/spec/DMN/20191111/FEEL/"
+  xmlns:camunda="http://camunda.org/schema/1.0/dmn">
+
+  <decision id="EmptyDecision" name="Empty Decision">
+    <decisionTable id="EmptyDecisionTable" hitPolicy="UNIQUE">
+      <!-- No rules -->
+      <input id="Input_dummy" label="Dummy Input">
+        <inputExpression id="InputExpression_dummy" typeRef="string">
+          <text>dummy</text>
+        </inputExpression>
+      </input>
+      <output id="Output_dummy" label="Dummy Output" name="dummyOutput" typeRef="string"/>
+    </decisionTable>
+  </decision>
+
+</definitions> 

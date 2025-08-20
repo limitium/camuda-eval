@@ -2,14 +2,17 @@ plugins {
     id 'java'
 }
 
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
 dependencies {
     implementation project(':evaluator')
     implementation platform('org.junit:junit-bom:5.10.0')
     implementation 'org.junit.jupiter:junit-jupiter'
 
     implementation 'org.yaml:snakeyaml:2.2'
-    implementation 'org.camunda.bpm.dmn:camunda-engine-dmn:7.23.0'
-    implementation 'org.camunda.bpm.model:camunda-dmn-model:7.23.0'
+    implementation 'org.camunda.bpm.dmn:camunda-engine-dmn:7.17.0'
+    implementation 'org.camunda.bpm.model:camunda-dmn-model:7.17.0'
 }
 
 test {

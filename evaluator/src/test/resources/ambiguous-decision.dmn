@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions id="AmbiguousDecisionDef" name="Ambiguous Decision Definitions"
+  namespace="http://camunda.org/schema/1.0/dmn"
+  xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+  xmlns:feel="https://www.omg.org/spec/DMN/20191111/FEEL/"
+  xmlns:camunda="http://camunda.org/schema/1.0/dmn">
+
+  <decision id="AmbiguousDecision" name="Ambiguous Decision">
+    <decisionTable id="AmbiguousDecisionTable" hitPolicy="UNIQUE">
+      <input id="Input_value" label="Value">
+        <inputExpression id="InputExpression_value" typeRef="string">
+          <text>value</text>
+        </inputExpression>
+      </input>
+      <output id="Output_result" label="Result" name="result" typeRef="string"/>
+      <rule id="Rule1">
+        <inputEntry id="InputEntry_1"><text>"foo"</text></inputEntry>
+        <outputEntry id="OutputEntry_1"><text>"matched"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+</definitions> 
