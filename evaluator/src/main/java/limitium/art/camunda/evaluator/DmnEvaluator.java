@@ -5,7 +5,6 @@ import org.camunda.bpm.dmn.engine.DmnDecisionResult;
 import org.camunda.bpm.dmn.engine.DmnEngine;
 import org.camunda.bpm.dmn.engine.delegate.*;
 import org.camunda.bpm.engine.variable.VariableMap;
-import org.camunda.bpm.engine.variable.value.TypedValue;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.DumperOptions;
 import java.util.Map;
@@ -19,8 +18,6 @@ import org.camunda.bpm.model.dmn.DmnModelInstance;
 import org.camunda.bpm.model.dmn.instance.Decision;
 import org.camunda.bpm.model.dmn.instance.DecisionTable;
 import org.camunda.bpm.model.dmn.instance.Rule;
-import org.camunda.bpm.model.dmn.instance.Input;
-import org.camunda.bpm.model.dmn.instance.Output;
 import java.util.Collection;
 import java.nio.file.Path;
 import java.nio.file.Files;
@@ -100,6 +97,52 @@ public class DmnEvaluator {
             } catch (Exception e) {
                 throw new DmnEvaluationException("Error evaluating decision: " + dmnDecision.getKey(), e);
             }
+        }
+
+        // Convenience typed evaluators
+        public String evaluateToString(VariableMap vars) {
+            Object v = evaluate(vars).getSingleResult().getSingleEntry();
+            return v == null ? null : String.valueOf(v);
+        }
+
+        public Boolean evaluateToBoolean(VariableMap vars) {
+            Object v = evaluate(vars).getSingleResult().getSingleEntry();
+            if (v == null) return null;
+            if (v instanceof Boolean) return (Boolean) v;
+            if (v instanceof String) return Boolean.valueOf((String) v);
+            throw new IllegalStateException("Decision '" + dmnDecision.getKey() + "' did not return a boolean-compatible value: " + v.getClass().getName());
+        }
+
+        public Number evaluateToNumber(VariableMap vars) {
+            Object v = evaluate(vars).getSingleResult().getSingleEntry();
+            if (v == null) return null;
+            if (v instanceof Number) return (Number) v;
+            if (v instanceof String) {
+                try {
+                    return new java.math.BigDecimal((String) v);
+                } catch (NumberFormatException e) {
+                    throw new IllegalStateException("Decision '" + dmnDecision.getKey() + "' returned non-numeric string: " + v);
+                }
+            }
+            throw new IllegalStateException("Decision '" + dmnDecision.getKey() + "' did not return a numeric value: " + v.getClass().getName());
+        }
+
+        public String evaluateToString(java.util.Map<String, Object> vars) {
+            org.camunda.bpm.engine.variable.VariableMap map = org.camunda.bpm.engine.variable.Variables.createVariables();
+            if (vars != null) vars.forEach(map::putValue);
+            return evaluateToString(map);
+        }
+
+        public Boolean evaluateToBoolean(java.util.Map<String, Object> vars) {
+            org.camunda.bpm.engine.variable.VariableMap map = org.camunda.bpm.engine.variable.Variables.createVariables();
+            if (vars != null) vars.forEach(map::putValue);
+            return evaluateToBoolean(map);
+        }
+
+        public Number evaluateToNumber(java.util.Map<String, Object> vars) {
+            org.camunda.bpm.engine.variable.VariableMap map = org.camunda.bpm.engine.variable.Variables.createVariables();
+            if (vars != null) vars.forEach(map::putValue);
+            return evaluateToNumber(map);
         }
 
         private void printHistory(List<DmnDecisionTableEvaluationEvent> events) {

@@ -1,0 +1,26 @@
+tests:
+  - decision: BoolDecision
+    description: "Boolean true when flag is 'yes'"
+    in:
+      flag: "yes"
+    out: true
+
+  - decision: BoolDecision
+    description: "Boolean false otherwise"
+    in:
+      flag: "no"
+    out: false
+
+  - decision: NumDecision
+    description: "Numeric output 123 as number"
+    in:
+      n: 0
+    out: 123
+
+  - decision: StrDecision
+    description: "String output OK"
+    in:
+      x: "whatever"
+    out: "OK"
+
+

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions id="TypedDecisions" name="Typed Decisions"
+  namespace="http://camunda.org/schema/1.0/dmn"
+  xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+  xmlns:feel="https://www.omg.org/spec/DMN/20191111/FEEL/"
+  xmlns:camunda="http://camunda.org/schema/1.0/dmn">
+
+  <decision id="BoolDecision" name="Bool Decision">
+    <decisionTable id="BoolDecisionTable" hitPolicy="FIRST">
+      <input id="Input_flag" label="Flag">
+        <inputExpression id="InputExpression_flag" typeRef="string">
+          <text>flag</text>
+        </inputExpression>
+      </input>
+      <output id="Output_bool" label="Bool" name="boolOut" typeRef="boolean"/>
+      <rule id="Rule_true">
+        <inputEntry id="InputEntry_true"><text>"yes"</text></inputEntry>
+        <outputEntry id="OutputEntry_true"><text>true</text></outputEntry>
+      </rule>
+      <rule id="Rule_false">
+        <inputEntry id="InputEntry_false"><text>-</text></inputEntry>
+        <outputEntry id="OutputEntry_false"><text>false</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+  <decision id="NumDecision" name="Num Decision">
+    <decisionTable id="NumDecisionTable" hitPolicy="FIRST">
+      <input id="Input_num" label="Num">
+        <inputExpression id="InputExpression_num" typeRef="number">
+          <text>n</text>
+        </inputExpression>
+      </input>
+      <output id="Output_num" label="Num" name="numOut" typeRef="number"/>
+      <rule id="Rule_num">
+        <inputEntry id="InputEntry_any"><text>-</text></inputEntry>
+        <outputEntry id="OutputEntry_num"><text>123</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+  <decision id="StrDecision" name="Str Decision">
+    <decisionTable id="StrDecisionTable" hitPolicy="FIRST">
+      <input id="Input_any" label="Any">
+        <inputExpression id="InputExpression_any" typeRef="string">
+          <text>x</text>
+        </inputExpression>
+      </input>
+      <output id="Output_str" label="Str" name="strOut" typeRef="string"/>
+      <rule id="Rule_str">
+        <inputEntry id="InputEntry_any2"><text>-</text></inputEntry>
+        <outputEntry id="OutputEntry_str"><text>"OK"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+</definitions>
+
+

@@ -123,10 +123,10 @@ public final class DmnYamlTestFactory {
                                 org.camunda.bpm.engine.variable.VariableMap vars = Variables.createVariables();
                                 tc.inputs.forEach(vars::putValue);
 
-                                String actual = dec.evaluate(vars)
+                                Object actual = dec.evaluate(vars)
                                         .getSingleResult()
                                         .getSingleEntry();
-                                assertEquals(tc.expected, actual);
+                                assertEqualsNormalized(tc.expected, actual);
 
                                 synchronized (coverCollector) {
                                     coverCollector.addEvents(evaluator.getCoverageEvents());
@@ -184,7 +184,7 @@ public final class DmnYamlTestFactory {
                 .append(" → ")
                 .append(tc.inputs)
                 .append(" = ")
-                .append(tc.expected);
+                .append(String.valueOf(tc.expected));
         return sb.toString();
     }
 
@@ -204,10 +204,10 @@ public final class DmnYamlTestFactory {
     private static final class TestCase {
         final String decisionKey;
         final Map<String, Object> inputs;
-        final String expected;
+        final Object expected;
         final String description;
 
-        TestCase(String decisionKey, Map<String, Object> inputs, String expected, String description) {
+        TestCase(String decisionKey, Map<String, Object> inputs, Object expected, String description) {
             this.decisionKey = decisionKey;
             this.inputs = inputs;
             this.expected = expected;
@@ -224,11 +224,21 @@ public final class DmnYamlTestFactory {
             } else {
                 in = Collections.emptyMap();
             }
-            String out = Objects.requireNonNull((String) map.get("out"), "expected 'out' missing");
+            Object out = Objects.requireNonNull(map.get("out"), "expected 'out' missing");
             String desc = (String) map.get("description");
             if (desc == null) desc = "";
             return new TestCase(decision, in, out, desc);
         }
+    }
+
+    private static void assertEqualsNormalized(Object expected, Object actual) {
+        if (expected instanceof Number && actual instanceof Number) {
+            java.math.BigDecimal e = new java.math.BigDecimal(expected.toString());
+            java.math.BigDecimal a = new java.math.BigDecimal(actual.toString());
+            assertEquals(0, e.compareTo(a), "Numeric values differ: expected=" + e + ", actual=" + a);
+            return;
+        }
+        assertEquals(expected, actual);
     }
 
     // ────────────────────────────────────────────────────────────────────────────────
