@@ -1,0 +1,8 @@
+{
+  "id" : "fa794975-dc33-4eca-8bc8-aa6c2f2904fb",
+  "dmn" : "qwe.dmn",
+  "yaml" : "qwe.yaml",
+  "startedAt" : "2025-09-17T18:54:03.834466Z",
+  "state" : "failed",
+  "error" : "java.lang.RuntimeException: Failed to parse YAML: data/yaml/qwe.yaml"
+}

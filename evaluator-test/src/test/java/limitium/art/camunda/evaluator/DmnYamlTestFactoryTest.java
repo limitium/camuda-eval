@@ -19,7 +19,7 @@ public class DmnYamlTestFactoryTest {
                 Paths.get("src/test/resources"));
 
         List<DynamicTest> testStreamList = testStream.collect(Collectors.toList());
-        assertEquals(8, testStreamList.size(), "Should be 8 dynamic tests");
+        assertEquals(9, testStreamList.size(), "Should be 9 dynamic tests");
 
         return testStreamList.stream();
     }

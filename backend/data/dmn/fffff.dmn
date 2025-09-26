@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions id="Definitions_1" name="Definitions"
+  namespace="http://camunda.org/schema/1.0/dmn"
+  xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+  xmlns:feel="https://www.omg.org/spec/DMN/20191111/FEEL/"
+  xmlns:camunda="http://camunda.org/schema/1.0/dmn">
+  <decision id="Decision_1" name="Decision">
+    <decisionTable id="DecisionTable_1" hitPolicy="FIRST">
+      <input id="Input_1">
+        <inputExpression id="InputExpression_1" typeRef="string"><text>x</text></inputExpression>
+      </input>
+      <output id="Output_1" name="out" typeRef="string" />
+      <rule id="Rule_1">
+        <inputEntry id="InputEntry_1"><text>-</text></inputEntry>
+        <outputEntry id="OutputEntry_1"><text>"OK"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

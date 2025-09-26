@@ -54,6 +54,25 @@
     </decisionTable>
   </decision>
 
+  <decision id="MultiHitDecision" name="Multi-Hit Decision">
+    <decisionTable id="MultiHitDecisionTable" hitPolicy="RULE ORDER">
+      <input id="Input_mh" label="Any">
+        <inputExpression id="InputExpression_mh" typeRef="string">
+          <text>x</text>
+        </inputExpression>
+      </input>
+      <output id="Output_mh" label="Str" name="mhOut" typeRef="string"/>
+      <rule id="Rule_mh_A">
+        <inputEntry id="InputEntry_mh_A"><text>-</text></inputEntry>
+        <outputEntry id="OutputEntry_mh_A"><text>"A"</text></outputEntry>
+      </rule>
+      <rule id="Rule_mh_B">
+        <inputEntry id="InputEntry_mh_B"><text>-</text></inputEntry>
+        <outputEntry id="OutputEntry_mh_B"><text>"B"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
 </definitions>
 
 

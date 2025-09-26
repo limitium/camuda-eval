@@ -1,6 +1,8 @@
 package limitium.art.camunda.evaluator.junit;
 
 import limitium.art.camunda.evaluator.DmnEvaluator;
+import org.camunda.bpm.dmn.engine.DmnDecisionResult;
+import org.camunda.bpm.engine.variable.value.TypedValue;
 import org.camunda.bpm.engine.variable.Variables;
 import org.junit.jupiter.api.DynamicTest;
 import org.yaml.snakeyaml.DumperOptions;
@@ -123,9 +125,19 @@ public final class DmnYamlTestFactory {
                                 org.camunda.bpm.engine.variable.VariableMap vars = Variables.createVariables();
                                 tc.inputs.forEach(vars::putValue);
 
-                                Object actual = dec.evaluate(vars)
-                                        .getSingleResult()
-                                        .getSingleEntry();
+                                DmnDecisionResult result = dec.evaluate(vars);
+
+                                Object actual;
+                                if (tc.expected instanceof List<?>) {
+                                    List<Object> collected = new ArrayList<>();
+                                    for (Object rr : result.getResultList()) {
+                                        collected.add(extractSingleEntry(rr));
+                                    }
+                                    actual = collected;
+                                } else {
+                                    actual = result.getSingleResult().getSingleEntry();
+                                }
+
                                 assertEqualsNormalized(tc.expected, actual);
 
                                 synchronized (coverCollector) {
@@ -232,6 +244,16 @@ public final class DmnYamlTestFactory {
     }
 
     private static void assertEqualsNormalized(Object expected, Object actual) {
+        // List comparison with element-wise numeric normalization
+        if (expected instanceof List<?> && actual instanceof List<?>) {
+            List<?> eList = (List<?>) expected;
+            List<?> aList = (List<?>) actual;
+            assertEquals(eList.size(), aList.size(), "List sizes differ: expected=" + eList.size() + ", actual=" + aList.size());
+            for (int i = 0; i < eList.size(); i++) {
+                assertEqualsNormalized(eList.get(i), aList.get(i));
+            }
+            return;
+        }
         if (expected instanceof Number && actual instanceof Number) {
             java.math.BigDecimal e = new java.math.BigDecimal(expected.toString());
             java.math.BigDecimal a = new java.math.BigDecimal(actual.toString());
@@ -239,6 +261,27 @@ public final class DmnYamlTestFactory {
             return;
         }
         assertEquals(expected, actual);
+    }
+
+    private static Object extractSingleEntry(Object entry) {
+        if (entry == null) return null;
+        // Prefer Camunda API if available
+        try {
+            java.lang.reflect.Method m = entry.getClass().getMethod("getSingleEntry");
+            return m.invoke(entry);
+        } catch (Exception ignore) {
+            // Fallback to map assumption
+        }
+        if (entry instanceof Map<?, ?>) {
+            Map<?, ?> map = (Map<?, ?>) entry;
+            if (map.isEmpty()) return null;
+            Object value = map.values().iterator().next();
+            if (value instanceof TypedValue) {
+                return ((TypedValue) value).getValue();
+            }
+            return value;
+        }
+        return entry;
     }
 
     // ────────────────────────────────────────────────────────────────────────────────

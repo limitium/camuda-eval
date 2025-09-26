@@ -1,18 +1,66 @@
-# Camunda DMN Evaluator (Multi-Module)
+# Camunda DMN Evaluator
 
-This project provides a modular Java framework for evaluating Camunda DMN decision tables and collecting test coverage, with YAML-based test definitions.
+This project provides a complete web application for evaluating Camunda DMN decision tables with a Vue.js frontend and Java backend, containerized using Jib.
 
-## Modules
+## Architecture
 
-- **evaluator**: Core DMN evaluation logic, coverage collection, and YAML reporting utilities.
-- **evaluator-test**: All tests and test resources (DMN and YAML files). Depends on `evaluator`.
+- **Frontend**: Vue.js application with DMN editor and test runner
+- **Backend**: Java application serving both API and static frontend assets
+- **Containerization**: Single container using Jib (no Docker files needed)
 
-## Build & Test
+## Quick Start
+
+### Build and Run
 
 ```sh
-./gradlew build
-./gradlew :evaluator-test:test
+# Build complete application (frontend + backend container)
+make build-all
+
+# Run the containerized application
+make run
+
+# View logs
+make logs
+
+# Stop the application
+make stop
 ```
+
+### Development
+
+```sh
+# Start development environment
+make dev
+
+# This will show instructions for running frontend and backend separately
+```
+
+## Build Commands
+
+```sh
+# Build frontend only
+make build-frontend
+
+# Build backend container only
+make build-backend
+
+# Build complete application
+make build-all
+
+# Clean up build artifacts
+make clean
+```
+
+## API Endpoints
+
+The backend serves both the API and static frontend:
+
+- `GET /` - Frontend application
+- `GET /dmn` - List DMN files
+- `POST /dmn` - Upload DMN file
+- `GET /yaml` - List YAML test files
+- `POST /runs` - Run tests
+- `GET /runs/{id}/status` - Get test run status
 
 ## Directory Structure
 

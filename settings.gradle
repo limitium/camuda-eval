@@ -1,4 +1,6 @@
 rootProject.name = 'camunda-eval'
 include 'evaluator'
 include 'evaluator-test'
+include 'backend'
+// frontend is a separate Vite project; not a Gradle module
 

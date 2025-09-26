@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DMN Test YAML Schema",
+  "description": "Schema for DMN test YAML files",
+  "type": "object",
+  "required": ["tests"],
+  "properties": {
+    "tests": {
+      "type": "array",
+      "description": "Array of test cases",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["decision", "description", "in", "out"],
+        "properties": {
+          "decision": {
+            "type": "string",
+            "description": "Name of the DMN decision to test",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+            "examples": ["BoolDecision", "NumDecision", "StrDecision", "MultiHitDecision", "GenreDecision", "MovieDecision", "DrinkDecision"]
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of what this test case validates",
+            "minLength": 1,
+            "examples": [
+              "Boolean true when flag is 'yes'",
+              "Numeric output 123 as number",
+              "String output OK",
+              "Should collect outputs from multiple matching rules in order"
+            ]
+          },
+          "in": {
+            "type": "object",
+            "description": "Input variables for the DMN decision",
+            "minProperties": 1,
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "String input value"
+                },
+                {
+                  "type": "number",
+                  "description": "Numeric input value"
+                },
+                {
+                  "type": "boolean",
+                  "description": "Boolean input value"
+                },
+                {
+                  "type": "null",
+                  "description": "Null input value"
+                }
+              ]
+            },
+            "examples": [
+              {
+                "flag": "yes",
+                "n": 0,
+                "x": "whatever",
+                "preferredGenre": "comedy",
+                "userAge": 21
+              }
+            ]
+          },
+          "out": {
+            "description": "Expected output from the DMN decision",
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Single string output"
+              },
+              {
+                "type": "number",
+                "description": "Single numeric output"
+              },
+              {
+                "type": "boolean",
+                "description": "Single boolean output"
+              },
+              {
+                "type": "null",
+                "description": "Null output"
+              },
+              {
+                "type": "array",
+                "description": "Collection output (for multi-hit policies)",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "examples": [
+                  ["A", "B"],
+                  ["Comedy", "Drama"],
+                  [123, 456]
+                ]
+              }
+            ],
+            "examples": [
+              true,
+              false,
+              123,
+              "OK",
+              ["A", "B"],
+              "Comedy",
+              "Action Thriller",
+              "Juice"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "tests": [
+        {
+          "decision": "BoolDecision",
+          "description": "Boolean true when flag is 'yes'",
+          "in": {
+            "flag": "yes"
+          },
+          "out": true
+        },
+        {
+          "decision": "MultiHitDecision",
+          "description": "Should collect outputs from multiple matching rules in order",
+          "in": {
+            "x": "anything"
+          },
+          "out": ["A", "B"]
+        }
+      ]
+    }
+  ]
+}

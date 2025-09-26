@@ -167,7 +167,7 @@ public class DmnEvaluator {
                     ruleMap.put("outputs", outputs);
                     matchedRules.add(ruleMap);
                 }
-                eventMap.put("matchedRules", matchedRules);
+                eventMap.put("matchedRules", matchedRules); 
                 history.add(eventMap);
             }
             // YAML options for pretty output

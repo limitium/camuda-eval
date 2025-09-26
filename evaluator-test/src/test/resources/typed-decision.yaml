@@ -23,4 +23,12 @@ tests:
       x: "whatever"
     out: "OK"
 
+  - decision: MultiHitDecision
+    description: "Should collect outputs from multiple matching rules in order"
+    in:
+      x: "anything"
+    out:
+      - "A"
+      - "B"
+
 
