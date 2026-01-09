@@ -5,8 +5,6 @@ import org.camunda.bpm.dmn.engine.DmnDecisionResult;
 import org.camunda.bpm.dmn.engine.DmnEngine;
 import org.camunda.bpm.dmn.engine.delegate.*;
 import org.camunda.bpm.engine.variable.VariableMap;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.DumperOptions;
 import java.util.Map;
 import java.util.LinkedHashMap;
 
@@ -18,6 +16,9 @@ import org.camunda.bpm.model.dmn.DmnModelInstance;
 import org.camunda.bpm.model.dmn.instance.Decision;
 import org.camunda.bpm.model.dmn.instance.DecisionTable;
 import org.camunda.bpm.model.dmn.instance.Rule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Collection;
 import java.nio.file.Path;
 import java.nio.file.Files;
@@ -55,7 +56,7 @@ public class DmnEvaluator {
         private final DmnDecision dmnDecision;
         private final DmnEvaluator dmnEvaluator;
 
-        private static final java.util.logging.Logger LOGGER = java.util.logging.Logger.getLogger(DmnDecisionEvaluator.class.getName());
+        private static final Logger LOGGER = LoggerFactory.getLogger(DmnDecisionEvaluator.class);
 
         public DmnDecisionEvaluator(DmnDecision dmnDecision, DmnEvaluator dmnEvaluator) {
             this.dmnDecision = dmnDecision;
@@ -146,38 +147,84 @@ public class DmnEvaluator {
         }
 
         private void printHistory(List<DmnDecisionTableEvaluationEvent> events) {
-            // Prepare YAML output
-            List<Map<String, Object>> history = new ArrayList<>();
+            String decisionKey = dmnDecision.getKey();
+            
+            // Build JSON format for machine processing - minimal overhead
+            StringBuilder json = new StringBuilder(events.size() * 120 + 80);
+            json.append("{\"decision\":\"").append(escapeJson(decisionKey)).append("\",\"events\":[");
+            
+            boolean firstEvent = true;
             for (DmnDecisionTableEvaluationEvent evt : events) {
-                Map<String, Object> eventMap = new LinkedHashMap<>();
-                eventMap.put("decisionTable", evt.getDecisionTable().getKey());
-                // Inputs
-                Map<String, Object> inputs = new LinkedHashMap<>();
+                if (!firstEvent) json.append(',');
+                firstEvent = false;
+                
+                json.append("{\"decisionTable\":\"").append(escapeJson(evt.getDecisionTable().getKey())).append("\",\"inputs\":{");
+                boolean firstInput = true;
                 for (DmnEvaluatedInput inp : evt.getInputs()) {
-                    inputs.put(inp.getName(), inp.getValue().getValue());
+                    if (!firstInput) json.append(',');
+                    firstInput = false;
+                    json.append('"').append(escapeJson(inp.getName())).append("\":");
+                    appendJsonValue(json, inp.getValue().getValue());
                 }
-                eventMap.put("inputs", inputs);
-                // Matched rules
-                List<Map<String, Object>> matchedRules = new ArrayList<>();
+                json.append("},\"matchedRules\":[");
+                boolean firstRule = true;
                 for (DmnEvaluatedDecisionRule rule : evt.getMatchingRules()) {
-                    Map<String, Object> ruleMap = new LinkedHashMap<>();
-                    ruleMap.put("ruleId", rule.getId());
-                    Map<String, Object> outputs = new LinkedHashMap<>();
-                    rule.getOutputEntries().forEach((k, v) -> outputs.put(k, v.getValue().getValue()));
-                    ruleMap.put("outputs", outputs);
-                    matchedRules.add(ruleMap);
+                    if (!firstRule) json.append(',');
+                    firstRule = false;
+                    json.append("{\"ruleId\":\"").append(escapeJson(rule.getId())).append("\",\"outputs\":{");
+                    boolean firstOutput = true;
+                    for (Map.Entry<String, DmnEvaluatedOutput> entry : rule.getOutputEntries().entrySet()) {
+                        if (!firstOutput) json.append(',');
+                        firstOutput = false;
+                        json.append('"').append(escapeJson(entry.getKey())).append("\":");
+                        appendJsonValue(json, entry.getValue().getValue().getValue());
+                    }
+                    json.append("}}");
                 }
-                eventMap.put("matchedRules", matchedRules); 
-                history.add(eventMap);
+                json.append("]}");
             }
-            // YAML options for pretty output
-            DumperOptions options = new DumperOptions();
-            options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-            options.setPrettyFlow(true);
-            Yaml yaml = new Yaml(options);
-            String yamlStr = yaml.dump(history);
-            LOGGER.info("\n=== DMN Evaluation History (YAML) for decision: '" + dmnDecision.getKey() + "' ===\n" + yamlStr + "=== End of History ===\n");
+            json.append("]}");
+            
+            LOGGER.info(json.toString());
         }
+        
+        private void appendJsonValue(StringBuilder sb, Object value) {
+            if (value == null) {
+                sb.append("null");
+            } else if (value instanceof String) {
+                sb.append('"').append(escapeJson((String) value)).append('"');
+            } else if (value instanceof Number || value instanceof Boolean) {
+                sb.append(value);
+            } else {
+                sb.append('"').append(escapeJson(String.valueOf(value))).append('"');
+            }
+        }
+        
+        private String escapeJson(String str) {
+            if (str == null) return "";
+            StringBuilder sb = new StringBuilder(str.length() + 10);
+            for (int i = 0; i < str.length(); i++) {
+                char c = str.charAt(i);
+                switch (c) {
+                    case '"': sb.append("\\\""); break;
+                    case '\\': sb.append("\\\\"); break;
+                    case '\b': sb.append("\\b"); break;
+                    case '\f': sb.append("\\f"); break;
+                    case '\n': sb.append("\\n"); break;
+                    case '\r': sb.append("\\r"); break;
+                    case '\t': sb.append("\\t"); break;
+                    default:
+                        if (c < 0x20) {
+                            sb.append(String.format("\\u%04x", (int) c));
+                        } else {
+                            sb.append(c);
+                        }
+                        break;
+                }
+            }
+            return sb.toString();
+        }
+        
     }
 
     public DmnEvaluator() {
