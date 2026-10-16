@@ -1,16 +1,20 @@
 package limitium.art.camunda.evaluator.junit;
 
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
+
 import limitium.art.camunda.evaluator.DmnEvaluator;
+import limitium.art.camunda.evaluator.testspec.DecisionTests;
+import limitium.art.camunda.evaluator.testspec.TestCase;
+import limitium.art.camunda.evaluator.testspec.TestSpec;
+import limitium.art.camunda.evaluator.testspec.TestSpecReader;
 import org.camunda.bpm.dmn.engine.DmnDecisionResult;
 import org.camunda.bpm.engine.variable.value.TypedValue;
 import org.camunda.bpm.engine.variable.Variables;
 import org.junit.jupiter.api.DynamicTest;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -114,36 +118,27 @@ public final class DmnYamlTestFactory {
                             return; // silently ignore unmatched DMN file
                         }
 
-                        List<TestCase> cases = parseYamlCases(yamlPath);
-                        for (TestCase tc : cases) {
-                            String display = buildDisplayName(baseName, tc);
-                            generated.add(DynamicTest.dynamicTest(display, () -> {
-                                DmnEvaluator evaluator = new DmnEvaluator();
-                                evaluator.setCollectCoverage(true);
-                                DmnEvaluator.DmnDecisionEvaluator dec = evaluator.loadRule(dmnPath, tc.decisionKey);
+                        TestSpec spec = readSpec(yamlPath);
+                        for (final DecisionTests decision : spec.decisions) {
+                            for (final TestCase tc : decision.cases) {
+                                String display = buildDisplayName(baseName, decision, tc);
+                                generated.add(DynamicTest.dynamicTest(display, () -> {
+                                    DmnEvaluator evaluator = new DmnEvaluator();
+                                    evaluator.setCollectCoverage(true);
+                                    DmnEvaluator.DmnDecisionEvaluator dec =
+                                            evaluator.loadRule(dmnPath, decision.decision);
 
-                                org.camunda.bpm.engine.variable.VariableMap vars = Variables.createVariables();
-                                tc.inputs.forEach(vars::putValue);
+                                    org.camunda.bpm.engine.variable.VariableMap vars = Variables.createVariables();
+                                    tc.inputsAsMap(decision.inputColumns).forEach(vars::putValue);
 
-                                DmnDecisionResult result = dec.evaluate(vars);
+                                    DmnDecisionResult result = dec.evaluate(vars);
+                                    assertExpectations(decision, tc, result);
 
-                                Object actual;
-                                if (tc.expected instanceof List<?>) {
-                                    List<Object> collected = new ArrayList<>();
-                                    for (Object rr : result.getResultList()) {
-                                        collected.add(extractSingleEntry(rr));
+                                    synchronized (coverCollector) {
+                                        coverCollector.addEvents(evaluator.getCoverageEvents());
                                     }
-                                    actual = collected;
-                                } else {
-                                    actual = result.getSingleResult().getSingleEntry();
-                                }
-
-                                assertEqualsNormalized(tc.expected, actual);
-
-                                synchronized (coverCollector) {
-                                    coverCollector.addEvents(evaluator.getCoverageEvents());
-                                }
-                            }));
+                                }));
+                            }
                         }
                     });
         }
@@ -154,49 +149,60 @@ public final class DmnYamlTestFactory {
     }
 
     // ────────────────────────────────────────────────────────────────────────────────
-    // YAML parsing helpers
+    // Test spec helpers
     // ────────────────────────────────────────────────────────────────────────────────
 
-    private static List<TestCase> parseYamlCases(Path yamlPath) {
-        LoaderOptions lo = new LoaderOptions();
-        Yaml yaml = new Yaml(new SafeConstructor(lo));
-        try (InputStream in = Files.newInputStream(yamlPath)) {
-            Map<?, ?> root = yaml.load(in);
-            // Manually pull the node to avoid generics capture issues
-            List<Map<String, Object>> rawCases;
-            if (root == null) {
-                rawCases = Collections.emptyList();
-            } else {
-                Object testsNode = root.get("tests");
-                if (testsNode instanceof List<?>) {
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> tmp = (List<Map<String, Object>>) testsNode;
-                    rawCases = tmp;
-                } else {
-                    rawCases = Collections.emptyList();
-                }
-            }
-            List<TestCase> cases = new ArrayList<>(rawCases.size());
-            for (Map<String, Object> map : rawCases) {
-                cases.add(TestCase.from(map));
-            }
-            return cases;
+    private static TestSpec readSpec(Path yamlPath) {
+        try {
+            byte[] bytes = Files.readAllBytes(yamlPath);
+            return TestSpecReader.read(new String(bytes, StandardCharsets.UTF_8));
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to parse YAML file " + yamlPath, e);
+            throw new IllegalStateException("Failed to read test spec " + yamlPath + ": "
+                    + e.getMessage(), e);
         }
     }
 
-    private static String buildDisplayName(String baseName, TestCase tc) {
-        StringBuilder sb = new StringBuilder();
-        if (tc.description != null && !tc.description.trim().isEmpty()) {
-            sb.append(tc.description).append(" | ");
+    /**
+     * One expectation column is compared against the decision's single entry, which is how a
+     * one-output table behaves; several are compared against the result map by output name.
+     */
+    private static void assertExpectations(DecisionTests decision, TestCase tc,
+                                           DmnDecisionResult result) {
+        if (decision.outputColumns.size() == 1) {
+            Object expected = tc.expected.get(0);
+            Object actual;
+            if (expected instanceof List<?>) {
+                List<Object> collected = new ArrayList<>();
+                for (Object rr : result.getResultList()) {
+                    collected.add(extractSingleEntry(rr));
+                }
+                actual = collected;
+            } else {
+                actual = result.getSingleResult().getSingleEntry();
+            }
+            assertEqualsNormalized(expected, actual);
+            return;
         }
-        sb.append(baseName)
-                .append(':').append(tc.decisionKey)
-                .append(" → ")
-                .append(tc.inputs)
-                .append(" = ")
-                .append(String.valueOf(tc.expected));
+        Map<String, Object> actual = result.getSingleResult();
+        for (int i = 0; i < decision.outputColumns.size(); i++) {
+            String output = decision.outputColumns.get(i);
+            try {
+                assertEqualsNormalized(tc.expected.get(i), actual.get(output));
+            } catch (AssertionError e) {
+                throw new AssertionError(output + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private static String buildDisplayName(String baseName, DecisionTests decision, TestCase tc) {
+        StringBuilder sb = new StringBuilder();
+        if (tc.scenario != null && !tc.scenario.trim().isEmpty()) {
+            sb.append(tc.scenario).append(" | ");
+        }
+        sb.append(baseName).append(':').append(decision.decision)
+                .append(" \u2192 ").append(tc.inputsAsMap(decision.inputColumns))
+                .append(" = ").append(tc.expected.size() == 1
+                        ? String.valueOf(tc.expected.get(0)) : String.valueOf(tc.expected));
         return sb.toString();
     }
 
@@ -213,35 +219,6 @@ public final class DmnYamlTestFactory {
     // Internal value objects
     // ────────────────────────────────────────────────────────────────────────────────
 
-    private static final class TestCase {
-        final String decisionKey;
-        final Map<String, Object> inputs;
-        final Object expected;
-        final String description;
-
-        TestCase(String decisionKey, Map<String, Object> inputs, Object expected, String description) {
-            this.decisionKey = decisionKey;
-            this.inputs = inputs;
-            this.expected = expected;
-            this.description = description;
-        }
-
-        @SuppressWarnings("unchecked")
-        static TestCase from(Map<String, Object> map) {
-            String decision = Objects.requireNonNull((String) map.get("decision"), "decision key missing");
-            Map<String, Object> in;
-            Object inObj = map.get("in");
-            if (inObj instanceof Map) {
-                in = (Map<String, Object>) inObj;
-            } else {
-                in = Collections.emptyMap();
-            }
-            Object out = Objects.requireNonNull(map.get("out"), "expected 'out' missing");
-            String desc = (String) map.get("description");
-            if (desc == null) desc = "";
-            return new TestCase(decision, in, out, desc);
-        }
-    }
 
     private static void assertEqualsNormalized(Object expected, Object actual) {
         // List comparison with element-wise numeric normalization

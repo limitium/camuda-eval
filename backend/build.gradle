@@ -1,4 +1,6 @@
 plugins {
+    id 'org.springframework.boot' version '3.2.0'
+    id 'io.spring.dependency-management' version '1.1.4'
     id 'application'
     id 'java'
     id 'com.google.cloud.tools.jib' version '3.4.0'
@@ -34,19 +36,27 @@ tasks.withType(JavaCompile).configureEach {
 
 dependencies {
     implementation project(':evaluator')
-
-    implementation 'io.javalin:javalin:5.6.2'
+    
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.yaml:snakeyaml:2.2'
     implementation 'org.camunda.bpm.dmn:camunda-engine-dmn:7.17.0'
     implementation 'org.camunda.bpm.model:camunda-dmn-model:7.17.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.1'
     implementation 'com.fasterxml.jackson.core:jackson-annotations:2.17.1'
     implementation 'com.fasterxml.jackson.core:jackson-core:2.17.1'
-    implementation 'org.slf4j:slf4j-simple:2.0.13'
+
+    // Git is the source of truth for rules and releases. JGit 6.7 targets Java 11; this module is
+    // 17, but the root build pins evaluator/evaluator-test to release=8 where it would compile and
+    // then fail at runtime — so it belongs here and nowhere else.
+    implementation 'org.eclipse.jgit:org.eclipse.jgit:6.7.0.202309050840-r'
+    implementation 'org.eclipse.jgit:org.eclipse.jgit.ssh.apache:6.7.0.202309050840-r'
+    // Deploying: one compacted topic per server, keyed by domain.
+    implementation 'org.apache.kafka:kafka-clients'
 }
 
 application {
-    mainClass = 'limitium.art.camunda.backend.Server'
+    mainClass = 'limitium.art.camunda.backend.CamundaEvalApplication'
 }
 
 
@@ -64,7 +74,10 @@ jib {
         ports = ['7070']
         volumes = ['/data']
         workingDirectory = '/app'
-        mainClass = 'limitium.art.camunda.backend.Server'
+        mainClass = 'limitium.art.camunda.backend.CamundaEvalApplication'
+        environment = [
+            'BASE_URL': System.getenv('BASE_URL') ?: ''
+        ]
     }
     extraDirectories {
         paths {
@@ -85,6 +98,8 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'org.awaitility:awaitility:4.2.0'
     testImplementation 'org.apache.httpcomponents.client5:httpclient5:5.3.1'
+    // A real broker inside the test JVM, so the Kafka target is tested against Kafka, not a mock.
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
 }
 
 

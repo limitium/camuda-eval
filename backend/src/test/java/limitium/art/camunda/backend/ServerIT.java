@@ -11,8 +11,8 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import io.javalin.Javalin;
+import org.springframework.boot.SpringApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -26,7 +26,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class ServerIT {
-    static Javalin app;
+    static ConfigurableApplicationContext app;
     static final int port = 18080;
     static final Path tempRoot = Path.of("build/tmp/backend-it");
 
@@ -34,12 +34,14 @@ public class ServerIT {
     static void start() throws Exception {
         cleanDirectory(tempRoot);
         Files.createDirectories(tempRoot);
-        app = Server.startServer(tempRoot, port);
+        System.setProperty("dmn.data.root", tempRoot.toString());
+        System.setProperty("server.port", String.valueOf(port));
+        app = SpringApplication.run(CamundaEvalApplication.class);
     }
 
     @AfterAll
     static void stop() {
-        if (app != null) app.stop();
+        if (app != null) app.close();
     }
 
     @Test
@@ -50,13 +52,13 @@ public class ServerIT {
             String yamlName = "it-decision.yaml";
             byte[] dmnBytes = DMN_CONTENT.getBytes(StandardCharsets.UTF_8);
             byte[] yamlBytes = YAML_CONTENT.getBytes(StandardCharsets.UTF_8);
-            uploadFile(http, url("/dmn"), dmnName, dmnBytes);
+            uploadFile(http, url("/api/dmn"), dmnName, dmnBytes);
             // YAML create endpoint removed; ensure PUT works after DMN created
             // PUT YAML
-            putRaw(http, url("/yaml/" + yamlName), yamlBytes);
+            putRaw(http, url("/api/yaml/" + yamlName), yamlBytes);
 
             // List DMN
-            String dmnList = get(http, url("/dmn"));
+            String dmnList = get(http, url("/api/dmn"));
             assertTrue(dmnList.contains(dmnName));
 
             // Trigger run
@@ -64,15 +66,15 @@ public class ServerIT {
             assertNotNull(runId);
 
             // Await finish
-            await().atMost(30, SECONDS).until(() -> get(http, url("/runs/" + runId + "/status")).contains("\"state\" : \"finished\""));
+            await().atMost(30, SECONDS).until(() -> get(http, url("/api/runs/" + runId + "/status")).contains("\"state\" : \"finished\""));
 
-            String log = get(http, url("/runs/" + runId + "/log"));
+            String log = get(http, url("/api/runs/" + runId + "/log"));
             assertTrue(log.contains("OK"));
         }
     }
 
     private static String triggerRun(CloseableHttpClient http, String dmn) throws IOException {
-        HttpPost post = new HttpPost(url("/runs"));
+        HttpPost post = new HttpPost(url("/api/runs"));
         HttpEntity entity = MultipartEntityBuilder.create()
                 .addTextBody("fileName", dmn.substring(0, dmn.lastIndexOf('.'))) // Remove .dmn extension
                 .addBinaryBody("dmnContent", DMN_CONTENT.getBytes(StandardCharsets.UTF_8), ContentType.APPLICATION_XML, dmn)
@@ -151,8 +153,8 @@ public class ServerIT {
     private static final String YAML_CONTENT = """
 tests:
   - decision: StrDecision
-    in:
-      x: "anything"
-    out: "OK"
+    columns: [scenario,  x,        "=> strOut"]
+    rows:
+           - [any input, anything, OK]
 """;
 }

@@ -1,34 +1,21 @@
 tests:
   - decision: BoolDecision
-    description: "Boolean true when flag is 'yes'"
-    in:
-      flag: "yes"
-    out: true
-
-  - decision: BoolDecision
-    description: "Boolean false otherwise"
-    in:
-      flag: "no"
-    out: false
+    columns: [scenario,                 flag,  "=> boolOut"]
+    rows:
+           - [yes is true,              "yes", true]
+           - [anything else is false,   "no",  false]
 
   - decision: NumDecision
-    description: "Numeric output 123 as number"
-    in:
-      n: 0
-    out: 123
+    columns: [scenario,                 n, "=> numOut"]
+    rows:
+           - [numeric output,           0, 123]
 
   - decision: StrDecision
-    description: "String output OK"
-    in:
-      x: "whatever"
-    out: "OK"
+    columns: [scenario,                 x,          "=> strOut"]
+    rows:
+           - [string output,            whatever,   OK]
 
   - decision: MultiHitDecision
-    description: "Should collect outputs from multiple matching rules in order"
-    in:
-      x: "anything"
-    out:
-      - "A"
-      - "B"
-
-
+    columns: [scenario,                 x,          "=> mhOut"]
+    rows:
+           - [collects in rule order,   anything,   [A, B]]

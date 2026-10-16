@@ -1,0 +1,118 @@
+{
+  "title": "Choose the visual world for camunda-eval",
+  "question": "The roll dealt the analysis ledger. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Analysis Ledger",
+      "kicker": "THE ROLL",
+      "lineage": "the accountant's columnar analysis pad and bound ledger",
+      "thesis": "Every rule, version and line is an entry on a ruled pad: rows are commits, columns are the lines they belong to.",
+      "palette": ["#f4f7f0", "#ffffff", "#1d2433", "#4f8a64", "#b7cfbc", "#c2352b"],
+      "materials": ["pale green ruled pad paper", "ink entries, red-ink corrections", "double rule under totals"],
+      "viewport": "Work spaces: one ruled sheet. Account columns across the top (main, Release 1.3, 1.2, 1.1, each space), every commit a ruled row, its dot in its account's column; the picked row is ticked and the bottom band carries the one next action.",
+      "risk": "Tips into heavy ERP if the ruling is drawn too dark or the type too small; it lives on generous rows and pale rules.",
+      "raised": [
+        {"from": "crouwel-grid-specimen", "raise": "The pad's ruling is the layout armature: every row, column and gutter snaps to one ruled pitch, and the graph lanes are the pad's own columns."},
+        {"from": "variable-font-specimen", "raise": "Hierarchy by scale contrast: version numbers and table names set large like folio figures, labels tiny."},
+        {"from": "digital-design-canon-dark-first-developer-console", "raise": "Destructive actions (close a line, remove a space) sit isolated by a ruled empty gutter, never beside a safe action."},
+        {"from": "pop-culture-shelf-doujin-event-catalog", "raise": "Entries pack edge to edge in whole ruled cells; density comes from the grid, not from smaller type."}
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "Transit Line Diagram",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Beck / Vignelli metro diagrams",
+      "thesis": "Release lines are coloured routes, versions are stations, landing is an interchange that carries a fix down the line to main.",
+      "palette": ["#ffffff", "#1a1a1a", "#0072ce", "#e4002b", "#00a651", "#ffd100"],
+      "materials": ["solid route strokes at 45°", "white station ticks", "interchange rings"],
+      "viewport": "Releases: the network diagram fills the stage, each line a coloured route; picking a station opens its tag action in the bottom band.",
+      "risk": "Familiar: 'git graph as a metro map' is where most runs in this category land, and colour must then carry line identity."
+    },
+    {
+      "id": "challenger-orienteering",
+      "label": "Orienteering Course",
+      "verdict": "competitive",
+      "lineage": "ISOM orienteering map and control description sheet",
+      "thesis": "Lines are the terrain; your work space's path to main rides over it in course purple, each step a numbered control.",
+      "palette": ["#ffffff", "#f6e7a6", "#b6cc8f", "#a0522d", "#2b88c8", "#b0168c"],
+      "materials": ["fixed terrain inks", "purple course overlay", "control description table"],
+      "viewport": "Land: the graph as terrain, the landing chain drawn in purple control to control, the step list as the control description table.",
+      "case": "Holds product clarity (your path over shared terrain is exactly landing) but analysts do not know orienteering.",
+      "risk": "Without the map's own legibility, purple-on-terrain reads as decoration."
+    },
+    {
+      "id": "challenger-wayfinding",
+      "label": "Terminal Wayfinding",
+      "verdict": "competitive",
+      "lineage": "Schiphol yellow airport signage",
+      "thesis": "Each screen is a junction sign: only the next decision, in black on yellow, everything else stays in the corridor.",
+      "palette": ["#ffd200", "#111111", "#ffffff", "#5b5b5b"],
+      "materials": ["yellow sign bands", "black inset pictograms", "edge-locked arrows"],
+      "viewport": "A yellow band carries the one next action at the junction; the screen below is the corridor of lists and tables.",
+      "case": "Holds 'one next action' perfectly; weaker on dense tables and the graph.",
+      "risk": "Yellow everywhere collapses state colour; must stay reserved to the band."
+    },
+    {
+      "id": "challenger-crouwel",
+      "label": "Grid Specimen",
+      "verdict": "declined",
+      "lineage": "Wim Crouwel gridded specimen posters",
+      "palette": ["#ffffff", "#1a1a1a", "#7fb2e5"],
+      "materials": ["visible construction grid"],
+      "viewport": "Visible grid with monumental letterforms.",
+      "case": "Poster grammar fights an all-day table tool.",
+      "risk": "Monumental type wastes the desk.",
+      "kept": "The grid as visible armature, now the ledger's ruling."
+    },
+    {
+      "id": "challenger-specimen",
+      "label": "Variable Type Specimen",
+      "verdict": "declined",
+      "lineage": "foundry type specimen sites",
+      "palette": ["#fafafa", "#111111", "#ff4d00"],
+      "materials": ["live variable axes"],
+      "viewport": "A giant glyph with axis sliders.",
+      "case": "Nothing in the product is a typeface.",
+      "risk": "Pure ornament for this audience.",
+      "kept": "Hierarchy by scale contrast alone."
+    },
+    {
+      "id": "challenger-catalog",
+      "label": "Convention Catalog",
+      "verdict": "declined",
+      "lineage": "newsprint doujin event catalogs",
+      "palette": ["#e9e6df", "#1b1b1b", "#d43c7c"],
+      "materials": ["newsprint", "stamp-size thumbnails"],
+      "viewport": "Hundreds of thumbnails in a numbered grid.",
+      "case": "Thumbnail packing has nothing to show here.",
+      "risk": "Noise without images.",
+      "kept": "Whole-cell packing for density."
+    },
+    {
+      "id": "challenger-console",
+      "label": "Dark Console",
+      "verdict": "declined",
+      "lineage": "dark-first developer consoles",
+      "palette": ["#1e2126", "#2b2f36", "#7cc4fa", "#f07178"],
+      "materials": ["graphite panels", "hairline seams"],
+      "viewport": "Tiled graphite panels.",
+      "case": "You pinned a light theme; developer feel misses analysts.",
+      "risk": "Reads as a git client.",
+      "kept": "Destructive actions isolated by empty space."
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "buildPath": { "value": "code" },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A clean SaaS app: white, slate text, one blue accent, cards and a sidebar.",
+    "palette": ["#ffffff", "#0f172a", "#64748b", "#2563eb"],
+    "materials": ["rounded cards", "soft shadows", "sidebar nav"],
+    "viewport": "Sidebar of zones, page of cards, primary button in blue.",
+    "risk": "This is the generic dashboard you said would feel wrong."
+  },
+  "steer": true
+}

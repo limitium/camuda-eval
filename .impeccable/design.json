@@ -1,0 +1,667 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-14T16:58:42+00:00",
+  "title": "Design System: camunda-eval",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Ground White",
+        "canonical": "oklch(100% 0 0)",
+        "tonalRamp": [
+          "oklch(15% 0.0 0)",
+          "oklch(26% 0.0 0)",
+          "oklch(38% 0.0 0)",
+          "oklch(50% 0.0 0)",
+          "oklch(62% 0.0 0)",
+          "oklch(74% 0.0 0)",
+          "oklch(86% 0.0 0)",
+          "oklch(95% 0.0 0)"
+        ]
+      },
+      "platform": {
+        "role": "neutral",
+        "displayName": "Platform Grey",
+        "canonical": "oklch(97.2% 0.003 250)",
+        "tonalRamp": [
+          "oklch(15% 0.003 250)",
+          "oklch(26% 0.003 250)",
+          "oklch(38% 0.003 250)",
+          "oklch(50% 0.003 250)",
+          "oklch(62% 0.003 250)",
+          "oklch(74% 0.003 250)",
+          "oklch(86% 0.003 250)",
+          "oklch(95% 0.003 250)"
+        ]
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "Route Ink",
+        "canonical": "oklch(19% 0.01 260)",
+        "tonalRamp": [
+          "oklch(15% 0.01 260)",
+          "oklch(26% 0.01 260)",
+          "oklch(38% 0.01 260)",
+          "oklch(50% 0.01 260)",
+          "oklch(62% 0.01 260)",
+          "oklch(74% 0.01 260)",
+          "oklch(86% 0.01 260)",
+          "oklch(95% 0.01 260)"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink 2",
+        "canonical": "oklch(41% 0.012 260)",
+        "tonalRamp": [
+          "oklch(15% 0.012 260)",
+          "oklch(26% 0.012 260)",
+          "oklch(38% 0.012 260)",
+          "oklch(50% 0.012 260)",
+          "oklch(62% 0.012 260)",
+          "oklch(74% 0.012 260)",
+          "oklch(86% 0.012 260)",
+          "oklch(95% 0.012 260)"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Ink 3",
+        "canonical": "oklch(54% 0.01 260)",
+        "tonalRamp": [
+          "oklch(15% 0.01 260)",
+          "oklch(26% 0.01 260)",
+          "oklch(38% 0.01 260)",
+          "oklch(50% 0.01 260)",
+          "oklch(62% 0.01 260)",
+          "oklch(74% 0.01 260)",
+          "oklch(86% 0.01 260)",
+          "oklch(95% 0.01 260)"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(91% 0.004 260)",
+        "tonalRamp": [
+          "oklch(15% 0.004 260)",
+          "oklch(26% 0.004 260)",
+          "oklch(38% 0.004 260)",
+          "oklch(50% 0.004 260)",
+          "oklch(62% 0.004 260)",
+          "oklch(74% 0.004 260)",
+          "oklch(86% 0.004 260)",
+          "oklch(95% 0.004 260)"
+        ]
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "oklch(81% 0.006 260)",
+        "tonalRamp": [
+          "oklch(15% 0.006 260)",
+          "oklch(26% 0.006 260)",
+          "oklch(38% 0.006 260)",
+          "oklch(50% 0.006 260)",
+          "oklch(62% 0.006 260)",
+          "oklch(74% 0.006 260)",
+          "oklch(86% 0.006 260)",
+          "oklch(95% 0.006 260)"
+        ]
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "Hover Wash",
+        "canonical": "oklch(96.5% 0.004 250)",
+        "tonalRamp": [
+          "oklch(15% 0.004 250)",
+          "oklch(26% 0.004 250)",
+          "oklch(38% 0.004 250)",
+          "oklch(50% 0.004 250)",
+          "oklch(62% 0.004 250)",
+          "oklch(74% 0.004 250)",
+          "oklch(86% 0.004 250)",
+          "oklch(95% 0.004 250)"
+        ]
+      },
+      "select": {
+        "role": "neutral",
+        "displayName": "Select Wash",
+        "canonical": "oklch(94.5% 0.02 250)",
+        "tonalRamp": [
+          "oklch(15% 0.02 250)",
+          "oklch(26% 0.02 250)",
+          "oklch(38% 0.02 250)",
+          "oklch(50% 0.02 250)",
+          "oklch(62% 0.02 250)",
+          "oklch(74% 0.02 250)",
+          "oklch(86% 0.02 250)",
+          "oklch(95% 0.02 250)"
+        ]
+      },
+      "sign": {
+        "role": "primary",
+        "displayName": "Signage Black",
+        "canonical": "oklch(17% 0.008 260)",
+        "tonalRamp": [
+          "oklch(15% 0.008 260)",
+          "oklch(26% 0.008 260)",
+          "oklch(38% 0.008 260)",
+          "oklch(50% 0.008 260)",
+          "oklch(62% 0.008 260)",
+          "oklch(74% 0.008 260)",
+          "oklch(86% 0.008 260)",
+          "oklch(95% 0.008 260)"
+        ]
+      },
+      "route-main": {
+        "role": "primary",
+        "displayName": "Main Line Black",
+        "canonical": "oklch(19% 0.01 260)",
+        "tonalRamp": [
+          "oklch(15% 0.01 260)",
+          "oklch(26% 0.01 260)",
+          "oklch(38% 0.01 260)",
+          "oklch(50% 0.01 260)",
+          "oklch(62% 0.01 260)",
+          "oklch(74% 0.01 260)",
+          "oklch(86% 0.01 260)",
+          "oklch(95% 0.01 260)"
+        ]
+      },
+      "route-1": {
+        "role": "secondary",
+        "displayName": "Petrol Blue",
+        "canonical": "oklch(47% 0.13 222)",
+        "tonalRamp": [
+          "oklch(15% 0.063 222)",
+          "oklch(26% 0.087 222)",
+          "oklch(38% 0.113 222)",
+          "oklch(50% 0.13 222)",
+          "oklch(62% 0.13 222)",
+          "oklch(74% 0.109 222)",
+          "oklch(86% 0.083 222)",
+          "oklch(95% 0.063 222)"
+        ]
+      },
+      "route-2": {
+        "role": "secondary",
+        "displayName": "Signal Orange",
+        "canonical": "oklch(70% 0.17 55)",
+        "tonalRamp": [
+          "oklch(15% 0.077 55)",
+          "oklch(26% 0.108 55)",
+          "oklch(38% 0.142 55)",
+          "oklch(50% 0.17 55)",
+          "oklch(62% 0.17 55)",
+          "oklch(74% 0.136 55)",
+          "oklch(86% 0.102 55)",
+          "oklch(95% 0.077 55)"
+        ]
+      },
+      "route-3": {
+        "role": "secondary",
+        "displayName": "Line Purple",
+        "canonical": "oklch(47% 0.15 305)",
+        "tonalRamp": [
+          "oklch(15% 0.07 305)",
+          "oklch(26% 0.097 305)",
+          "oklch(38% 0.128 305)",
+          "oklch(50% 0.15 305)",
+          "oklch(62% 0.15 305)",
+          "oklch(74% 0.122 305)",
+          "oklch(86% 0.092 305)",
+          "oklch(95% 0.07 305)"
+        ]
+      },
+      "route-4": {
+        "role": "secondary",
+        "displayName": "Harbour Teal",
+        "canonical": "oklch(63% 0.12 178)",
+        "tonalRamp": [
+          "oklch(15% 0.06 178)",
+          "oklch(26% 0.082 178)",
+          "oklch(38% 0.106 178)",
+          "oklch(50% 0.12 178)",
+          "oklch(62% 0.12 178)",
+          "oklch(74% 0.102 178)",
+          "oklch(86% 0.078 178)",
+          "oklch(95% 0.06 178)"
+        ]
+      },
+      "route-5": {
+        "role": "secondary",
+        "displayName": "Metro Magenta",
+        "canonical": "oklch(56% 0.21 355)",
+        "tonalRamp": [
+          "oklch(15% 0.09 355)",
+          "oklch(26% 0.128 355)",
+          "oklch(38% 0.17 355)",
+          "oklch(50% 0.21 355)",
+          "oklch(62% 0.205 355)",
+          "oklch(74% 0.163 355)",
+          "oklch(86% 0.121 355)",
+          "oklch(95% 0.09 355)"
+        ]
+      },
+      "route-6": {
+        "role": "secondary",
+        "displayName": "Bronze",
+        "canonical": "oklch(50% 0.08 60)",
+        "tonalRamp": [
+          "oklch(15% 0.047 60)",
+          "oklch(26% 0.061 60)",
+          "oklch(38% 0.077 60)",
+          "oklch(50% 0.08 60)",
+          "oklch(62% 0.08 60)",
+          "oklch(74% 0.075 60)",
+          "oklch(86% 0.059 60)",
+          "oklch(95% 0.047 60)"
+        ]
+      },
+      "live": {
+        "role": "tertiary",
+        "displayName": "Live Amber",
+        "canonical": "oklch(74% 0.15 72)",
+        "tonalRamp": [
+          "oklch(15% 0.07 72)",
+          "oklch(26% 0.097 72)",
+          "oklch(38% 0.128 72)",
+          "oklch(50% 0.15 72)",
+          "oklch(62% 0.15 72)",
+          "oklch(74% 0.122 72)",
+          "oklch(86% 0.092 72)",
+          "oklch(95% 0.07 72)"
+        ]
+      },
+      "live-ink": {
+        "role": "tertiary",
+        "displayName": "Live Amber Ink",
+        "canonical": "oklch(47% 0.11 60)",
+        "tonalRamp": [
+          "oklch(15% 0.057 60)",
+          "oklch(26% 0.077 60)",
+          "oklch(38% 0.099 60)",
+          "oklch(50% 0.11 60)",
+          "oklch(62% 0.11 60)",
+          "oklch(74% 0.095 60)",
+          "oklch(86% 0.073 60)",
+          "oklch(95% 0.057 60)"
+        ]
+      },
+      "live-tint": {
+        "role": "tertiary",
+        "displayName": "Live Amber Wash",
+        "canonical": "oklch(96.5% 0.04 85)",
+        "tonalRamp": [
+          "oklch(15% 0.033 85)",
+          "oklch(26% 0.04 85)",
+          "oklch(38% 0.04 85)",
+          "oklch(50% 0.04 85)",
+          "oklch(62% 0.04 85)",
+          "oklch(74% 0.04 85)",
+          "oklch(86% 0.039 85)",
+          "oklch(95% 0.033 85)"
+        ]
+      },
+      "needs": {
+        "role": "tertiary",
+        "displayName": "Needs Red",
+        "canonical": "oklch(55% 0.2 27)",
+        "tonalRamp": [
+          "oklch(15% 0.087 27)",
+          "oklch(26% 0.123 27)",
+          "oklch(38% 0.163 27)",
+          "oklch(50% 0.2 27)",
+          "oklch(62% 0.197 27)",
+          "oklch(74% 0.157 27)",
+          "oklch(86% 0.117 27)",
+          "oklch(95% 0.087 27)"
+        ]
+      },
+      "needs-ink": {
+        "role": "tertiary",
+        "displayName": "Needs Red Ink",
+        "canonical": "oklch(49% 0.18 27)",
+        "tonalRamp": [
+          "oklch(15% 0.08 27)",
+          "oklch(26% 0.113 27)",
+          "oklch(38% 0.149 27)",
+          "oklch(50% 0.18 27)",
+          "oklch(62% 0.179 27)",
+          "oklch(74% 0.143 27)",
+          "oklch(86% 0.107 27)",
+          "oklch(95% 0.08 27)"
+        ]
+      },
+      "needs-tint": {
+        "role": "tertiary",
+        "displayName": "Needs Red Wash",
+        "canonical": "oklch(96.5% 0.025 25)",
+        "tonalRamp": [
+          "oklch(15% 0.025 25)",
+          "oklch(26% 0.025 25)",
+          "oklch(38% 0.025 25)",
+          "oklch(50% 0.025 25)",
+          "oklch(62% 0.025 25)",
+          "oklch(74% 0.025 25)",
+          "oklch(86% 0.025 25)",
+          "oklch(95% 0.025 25)"
+        ]
+      },
+      "edit": {
+        "role": "tertiary",
+        "displayName": "Edit Blue",
+        "canonical": "oklch(55% 0.17 262)",
+        "tonalRamp": [
+          "oklch(15% 0.077 262)",
+          "oklch(26% 0.108 262)",
+          "oklch(38% 0.142 262)",
+          "oklch(50% 0.17 262)",
+          "oklch(62% 0.17 262)",
+          "oklch(74% 0.136 262)",
+          "oklch(86% 0.102 262)",
+          "oklch(95% 0.077 262)"
+        ]
+      },
+      "edit-ink": {
+        "role": "tertiary",
+        "displayName": "Edit Blue Ink",
+        "canonical": "oklch(45% 0.16 262)",
+        "tonalRamp": [
+          "oklch(15% 0.073 262)",
+          "oklch(26% 0.103 262)",
+          "oklch(38% 0.135 262)",
+          "oklch(50% 0.16 262)",
+          "oklch(62% 0.16 262)",
+          "oklch(74% 0.129 262)",
+          "oklch(86% 0.097 262)",
+          "oklch(95% 0.073 262)"
+        ]
+      },
+      "edit-tint": {
+        "role": "tertiary",
+        "displayName": "Edit Blue Wash",
+        "canonical": "oklch(95.5% 0.03 262)",
+        "tonalRamp": [
+          "oklch(15% 0.03 262)",
+          "oklch(26% 0.03 262)",
+          "oklch(38% 0.03 262)",
+          "oklch(50% 0.03 262)",
+          "oklch(62% 0.03 262)",
+          "oklch(74% 0.03 262)",
+          "oklch(86% 0.03 262)",
+          "oklch(95% 0.03 262)"
+        ]
+      },
+      "clean": {
+        "role": "tertiary",
+        "displayName": "Clean Green",
+        "canonical": "oklch(56% 0.14 150)",
+        "tonalRamp": [
+          "oklch(15% 0.067 150)",
+          "oklch(26% 0.092 150)",
+          "oklch(38% 0.12 150)",
+          "oklch(50% 0.14 150)",
+          "oklch(62% 0.14 150)",
+          "oklch(74% 0.116 150)",
+          "oklch(86% 0.088 150)",
+          "oklch(95% 0.067 150)"
+        ]
+      },
+      "clean-ink": {
+        "role": "tertiary",
+        "displayName": "Clean Green Ink",
+        "canonical": "oklch(44% 0.11 150)",
+        "tonalRamp": [
+          "oklch(15% 0.057 150)",
+          "oklch(26% 0.077 150)",
+          "oklch(38% 0.099 150)",
+          "oklch(50% 0.11 150)",
+          "oklch(62% 0.11 150)",
+          "oklch(74% 0.095 150)",
+          "oklch(86% 0.073 150)",
+          "oklch(95% 0.057 150)"
+        ]
+      },
+      "clean-tint": {
+        "role": "tertiary",
+        "displayName": "Clean Green Wash",
+        "canonical": "oklch(96.5% 0.03 150)",
+        "tonalRamp": [
+          "oklch(15% 0.03 150)",
+          "oklch(26% 0.03 150)",
+          "oklch(38% 0.03 150)",
+          "oklch(50% 0.03 150)",
+          "oklch(62% 0.03 150)",
+          "oklch(74% 0.03 150)",
+          "oklch(86% 0.03 150)",
+          "oklch(95% 0.03 150)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The one screen title."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section titles within a screen."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Row names and sub-sections."
+      },
+      "lede": {
+        "displayName": "Lede",
+        "purpose": "Explanation under a screen title, ink-2, max 66ch."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default text; tabular numerals."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels, state words, meta, signage zones."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Timestamps and counts."
+      },
+      "bullet": {
+        "displayName": "Bullet",
+        "purpose": "Short line name inside a line bullet."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Values, identifiers, hosts, version tags only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "float",
+        "value": "0 8px 24px -8px oklch(20% 0.02 260 / 0.18)",
+        "purpose": "Transcript drawer rising from the action bar."
+      },
+      {
+        "name": "float-strong",
+        "value": "0 10px 30px -14px oklch(20% 0.02 260 / 0.35)",
+        "purpose": "Graph hover detail and menus; open overlays only."
+      },
+      {
+        "name": "cell-mark",
+        "value": "inset 0 -2px 0 var(--color-edit)",
+        "purpose": "Underline mark on an edited grid cell or column (needs-red for flagged)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "All state transitions, 120ms on controls."
+      },
+      {
+        "name": "turn",
+        "value": "turn 700ms linear infinite",
+        "purpose": "Busy rings on buttons and loaders."
+      },
+      {
+        "name": "ghost-run",
+        "value": "stroke-dashoffset 1.1s linear infinite (dash 6 5)",
+        "purpose": "A pending landing chain drawing itself along the route."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0ms",
+        "purpose": "prefers-reduced-motion zeroes all transitions and animations."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "768px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Default control: a white signage plate with a strong hairline.",
+      "html": "<button class=\"ds-btn\">Check again</button>",
+      "css": ".ds-btn { font-family: var(--font-sans, \"Overpass Variable\", Overpass, system-ui, sans-serif); display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid var(--color-rule-strong, oklch(81% 0.006 260)); border-radius: 4px; background: var(--color-ground, #fff); color: var(--color-ink, oklch(19% 0.01 260)); font-size: 0.875rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), border-color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-btn:hover { border-color: var(--color-ink, oklch(19% 0.01 260)); background: var(--color-hover, oklch(96.5% 0.004 250)); } .ds-btn:focus-visible { outline: 2px solid var(--color-ink, oklch(19% 0.01 260)); outline-offset: 2px; } .ds-btn:disabled { background: var(--color-platform, oklch(97.2% 0.003 250)); color: var(--color-ink-3, oklch(54% 0.01 260)); cursor: not-allowed; }"
+    },
+    {
+      "name": "Next Action",
+      "kind": "button",
+      "refersTo": "button-next",
+      "description": "The single black next action, one per screen, in the action bar.",
+      "html": "<button class=\"ds-btn-next\">Run the tests</button>",
+      "css": ".ds-btn-next { font-family: var(--font-sans, \"Overpass Variable\", Overpass, system-ui, sans-serif); display: inline-flex; align-items: center; height: 40px; padding: 0 20px; border: 1px solid var(--color-brand, #016c47); border-radius: 4px; background: var(--color-brand, #016c47); color: #fff; font-size: 0.875rem; font-weight: 700; white-space: nowrap; cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), border-color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-next:hover { background: var(--color-ink-2, oklch(41% 0.012 260)); border-color: var(--color-ink-2, oklch(41% 0.012 260)); } .ds-btn-next:focus-visible { outline: 2px solid var(--color-brand, #016c47); outline-offset: 2px; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Borderless secondary action, e.g. Back to the work space.",
+      "html": "<button class=\"ds-btn-quiet\">Back to the work space</button>",
+      "css": ".ds-btn-quiet { font-family: var(--font-sans, \"Overpass Variable\", Overpass, system-ui, sans-serif); display: inline-flex; align-items: center; height: 34px; padding: 0 8px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--color-ink-2, oklch(41% 0.012 260)); font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), color 120ms; } .ds-btn-quiet:hover { background: var(--color-hover, oklch(96.5% 0.004 250)); color: var(--color-ink, oklch(19% 0.01 260)); } .ds-btn-quiet:focus-visible { outline: 2px solid var(--color-ink, oklch(19% 0.01 260)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Text field with label; ink border and ring on focus.",
+      "html": "<label class=\"ds-label\">amount</label><input class=\"ds-field\" placeholder=\"amount\">",
+      "css": ".ds-label { font-family: var(--font-sans, \"Overpass Variable\", Overpass, system-ui, sans-serif); display: block; margin-bottom: 6px; font-size: 0.8125rem; font-weight: 600; color: var(--color-ink-2, oklch(41% 0.012 260)); } .ds-field { font-family: var(--font-sans, \"Overpass Variable\", Overpass, system-ui, sans-serif); display: block; width: 240px; height: 36px; padding: 0 10px; border: 1px solid var(--color-rule-strong, oklch(81% 0.006 260)); border-radius: 4px; background: var(--color-ground, #fff); color: var(--color-ink, oklch(19% 0.01 260)); font-size: 0.875rem; caret-color: var(--color-route-1, oklch(47% 0.13 222)); } .ds-field::placeholder { color: var(--color-ink-3, oklch(54% 0.01 260)); } .ds-field:focus { outline: none; border-color: var(--color-ink, oklch(19% 0.01 260)); box-shadow: 0 0 0 1px var(--color-ink, oklch(19% 0.01 260)); }"
+    },
+    {
+      "name": "Line Bullet",
+      "kind": "chip",
+      "refersTo": "line-bullet",
+      "description": "A route identity disc: route colour, white extrabold short name.",
+      "html": "<span class=\"ds-bullet\" style=\"background: oklch(19% 0.01 260)\">M</span> <span class=\"ds-bullet\" style=\"background: oklch(47% 0.13 222)\">1.3</span> <span class=\"ds-bullet\" style=\"background: oklch(47% 0.15 305)\">1.1</span>",
+      "css": ".ds-bullet { font-family: var(--font-sans, \"Overpass Variable\", Overpass, system-ui, sans-serif); display: inline-flex; align-items: center; justify-content: center; height: 22px; min-width: 22px; padding: 0 4px; border-radius: 9999px; color: #fff; font-size: 11px; font-weight: 800; line-height: 1; vertical-align: middle; }"
+    },
+    {
+      "name": "State Word",
+      "kind": "chip",
+      "refersTo": "label",
+      "description": "A state is always a word; the dot reinforces it.",
+      "html": "<span class=\"ds-state ds-live\">draft live</span> <span class=\"ds-state ds-needs\">failing</span> <span class=\"ds-state ds-clean\">passes</span> <span class=\"ds-state ds-edit\">edited</span>",
+      "css": ".ds-state { font-family: var(--font-sans, \"Overpass Variable\", Overpass, system-ui, sans-serif); display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; font-size: 0.8125rem; font-weight: 600; } .ds-state::before { content: \"\"; width: 7px; height: 7px; border-radius: 9999px; background: currentColor; } .ds-live { color: var(--color-live-ink, oklch(47% 0.11 60)); } .ds-live::before { background: var(--color-live, oklch(74% 0.15 72)); } .ds-needs { color: var(--color-needs-ink, oklch(49% 0.18 27)); } .ds-clean { color: var(--color-clean-ink, oklch(44% 0.11 150)); } .ds-edit { color: var(--color-edit-ink, oklch(45% 0.16 262)); } .ds-edit::before { background: var(--color-edit, oklch(55% 0.17 262)); }"
+    },
+    {
+      "name": "Version Tag",
+      "kind": "chip",
+      "refersTo": "version-tag",
+      "description": "A version is a label, so a pill: platform grey, ink mono text, never black (rectangles act, pills inform).",
+      "html": "<span class=\"ds-tag\">v1.2.1</span>",
+      "css": ".ds-tag { font-family: var(--font-mono, \"Overpass Mono\", ui-monospace, monospace); display: inline-flex; align-items: center; padding: 0 8px; border-radius: 9999px; background: var(--color-platform, oklch(97.2% 0.003 250)); box-shadow: inset 0 0 0 1px oklch(19% 0.01 260 / 0.06); color: var(--color-ink, oklch(19% 0.01 260)); font-size: 0.72rem; font-weight: 600; line-height: 1.75; }"
+    },
+    {
+      "name": "Signage Band",
+      "kind": "nav",
+      "refersTo": "top-line",
+      "description": "The black top band: zones as wayfinding, env and person right.",
+      "html": "<header class=\"ds-top\"><nav class=\"ds-zones\"><strong class=\"ds-brand\">Rules</strong><a class=\"ds-zone\">Applications</a><a class=\"ds-zone ds-on\">Work spaces</a><a class=\"ds-zone\">Releases</a></nav><span class=\"ds-env\">dev</span></header>",
+      "css": ".ds-top { font-family: var(--font-sans, \"Overpass Variable\", Overpass, system-ui, sans-serif); display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 24px; background: var(--color-brand, #016c47); color: #fff; font-size: 0.8125rem; } .ds-zones { display: flex; align-items: center; gap: 4px; } .ds-brand { margin-right: 12px; font-size: 15px; font-weight: 800; } .ds-zone { padding: 6px 10px; border-radius: 3px; font-weight: 600; color: rgb(255 255 255 / 0.75); cursor: pointer; transition: background-color 120ms; } .ds-zone:hover { background: rgb(255 255 255 / 0.1); color: #fff; } .ds-zone.ds-on { background: #fff; color: var(--color-brand, #016c47); } .ds-env { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--color-live, oklch(74% 0.15 72)); } .ds-env::before { content: \"\"; width: 8px; height: 8px; border-radius: 9999px; background: currentColor; }"
+    },
+    {
+      "name": "Route Segment",
+      "kind": "custom",
+      "refersTo": "line-bullet",
+      "description": "Network atoms: a 4px route stroke, a tick, an interchange ring, a 2px branch service on a 45-degree elbow.",
+      "html": "<svg class=\"ds-route\" width=\"220\" height=\"80\" viewBox=\"0 0 220 80\"><path d=\"M20 10 V70\" stroke=\"oklch(19% 0.01 260)\" stroke-width=\"4\" stroke-linecap=\"round\" fill=\"none\"/><path d=\"M20 26 h8\" stroke=\"oklch(19% 0.01 260)\" stroke-width=\"3.5\" stroke-linecap=\"round\"/><path d=\"M20 58 H60 L74 44 V20\" stroke=\"oklch(47% 0.13 222)\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"/><circle cx=\"20\" cy=\"58\" r=\"6\" fill=\"#fff\" stroke=\"oklch(19% 0.01 260)\" stroke-width=\"3\"/><circle cx=\"74\" cy=\"20\" r=\"3.5\" fill=\"oklch(47% 0.13 222)\"/></svg>",
+      "css": ".ds-route { display: block; }"
+    },
+    {
+      "name": "Failure Notice",
+      "kind": "card",
+      "refersTo": "notice-needs",
+      "description": "The only boxed element: a state-tinted notice, max 70ch.",
+      "html": "<div class=\"ds-notice\">Your saved version fails its own tests. Open the table, fix the marked rows, save a version, and come back.</div>",
+      "css": ".ds-notice { font-family: var(--font-sans, \"Overpass Variable\", Overpass, system-ui, sans-serif); max-width: 70ch; padding: 14px 16px; border: 1px solid oklch(85% 0.06 25); border-radius: 4px; background: var(--color-needs-tint, oklch(96.5% 0.025 25)); color: var(--color-ink, oklch(19% 0.01 260)); font-size: 0.875rem; line-height: 1.5; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Transit Line Diagram",
+    "overview": "Releases are a transit network. main and every release line are routes, each with one colour and one bullet wherever it appears; versions are stations with name plates; a work space is a branch service that runs in the colour of the line it lands in and rejoins it; landing is a ride from the space through each interchange to main. The interface reads like station signage: a black signage band on top, white ground, near-black road-sign type, and the network diagram drawn with solid route strokes, ticks and interchange rings.\n\nDensity is a working tool's: rows between hairlines, no cards, no shadows at rest. Colour is spent on two things only, route identity and state words, and the two vocabularies never share a hue. Every screen ends in a white bottom band carrying the session transcript on the left and exactly one black next action on the right, the same black as main's bullet.\n\nThe world refuses the sidebar-and-cards dashboard and the grey git-client commit graph.",
+    "keyCharacteristics": [
+      "Black signage band (48px) on top: wayfinding zones, the current space with its line bullet, environment and person on the right.",
+      "Route palette owns identity: main is black \"M\", release lines cycle through six route colours by line number.",
+      "Line bullets and station rings are the atoms; solid 4px route strokes, 2px branch services, interchange rings.",
+      "Hairline rows are the only container; white ground, platform grey only for disabled and inset surfaces.",
+      "One filled black control per screen: the next action."
+    ],
+    "rules": [
+      {
+        "name": "The Two Vocabularies Rule",
+        "body": "Route colours identify lines; amber, red, green and edit-blue are state words. No route colour may sit on the state hues, and a state is never signalled by a route colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Word First Rule",
+        "body": "A state is always a word; the 7px dot and the colour reinforce it, never replace it.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Black Button Rule",
+        "body": "The only filled black control on a screen is the next action in the action bar.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Is Data Rule",
+        "body": "Overpass Mono appears only for what the analyst could type or copy: cell values, column names, identifiers, hosts, version names. Never for prose or headings.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Headings, buttons and zones are sentence case; nothing is set uppercase.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Platform Rule",
+        "body": "Nothing on the page plane carries a shadow; only open overlays do.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** name every line with its bullet and its route colour, derived from `routeColour()`; never pick a line colour by hand.",
+      "**Do** keep the next action as the only black filled button, in the action bar.",
+      "**Do** say every state as a word, with the 7px dot in the state colour.",
+      "**Do** separate list items with hairline rows (rule) on the white ground.",
+      "**Do** draw routes with solid round-capped strokes and 45-degree elbows; mark versions with interchange rings and black mono name plates.",
+      "**Do** keep mono for values, identifiers and versions only."
+    ],
+    "donts": [
+      "**Don't** wrap lists or sections in cards or give the page plane shadows; only open overlays float.",
+      "**Don't** use amber, red, green or edit-blue as a line colour, or a route colour as a state.",
+      "**Don't** put a second black filled control on a screen.",
+      "**Don't** draw the network as a grey git-client graph or curve its routes.",
+      "**Don't** set headings, buttons or labels in uppercase."
+    ]
+  }
+}

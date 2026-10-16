@@ -1,25 +1,16 @@
 tests:
   - decision: GenreDecision
-    description: "Should return 'Comedy' when preferredGenre is 'comedy'"
-    in:
-      preferredGenre: "comedy"
-    out: "Comedy"
-
-  - decision: GenreDecision
-    description: "Should return 'Drama' for any genre except 'action' or 'comedy'"
-    in:
-      preferredGenre: "any string"
-    out: "Drama"
+    columns: [scenario,                 preferredGenre, "=> genreRecommendation"]
+    rows:
+           - [comedy maps to Comedy,    comedy,         Comedy]
+           - [anything else is Drama,   "any string",   Drama]
 
   - decision: MovieDecision
-    description: "Should recommend 'Action Thriller' for action genre and user age 21"
-    in:
-      preferredGenre: "action"
-      userAge: 21
-    out: "Action Thriller"
+    columns: [scenario,                 preferredGenre, userAge, "=> movieRecommendation"]
+    rows:
+           - [action for an adult,      action,         21,      "Action Thriller"]
 
   - decision: DrinkDecision
-    description: "Should recommend 'Juice' for user age 16 in DrinkDecision"
-    in:
-      userAge: 16
-    out: "Juice"
+    columns: [scenario,                 userAge, "=> drinkRecommendation"]
+    rows:
+           - [under age gets juice,     16,      Juice]

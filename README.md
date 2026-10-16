@@ -26,6 +26,30 @@ make logs
 make stop
 ```
 
+### Custom Base Path Configuration
+
+Deploy the app under a path behind the same domain using a single runtime variable `BASE_URL` (no slashes). For example, `BASE_URL=myapp` serves the app under `http://domain/myapp/` and the API under `http://domain/myapp/api/...`.
+
+```sh
+# Build once (no BASE_URL needed at build time)
+make build-all
+
+# Run with different base paths at runtime
+make run BASE_URL=myapp
+make run BASE_URL=another-app
+
+# Or use the example deployment script
+./example-deploy.sh
+```
+
+**Environment Variables:**
+- `BASE_URL`: Base path after domain for both frontend and backend (e.g., `myapp`). This is a **runtime-only** configuration.
+
+The backend automatically:
+1. Sets `server.servlet.context-path=/${BASE_URL}` 
+2. Injects the base URL into the frontend HTML at runtime
+3. The frontend reads the base URL from `window.BASE_URL` and configures axios accordingly
+
 ### Development
 
 ```sh
@@ -284,3 +308,23 @@ Place DMN and YAML files in `evaluator-test/src/test/resources/` and test classe
 ---
 
 For more examples, see the test files in the `evaluator-test` module. 
+## Demo with Docker
+
+`docker compose up --build` starts dev and prod, which meet only in one git remote. dev authors,
+tests, releases and tries rules. prod changes nothing: it shows what runs and any version, runs
+tests and tries values, and deploys released (tagged) versions — every other write is refused with
+403 (`DeployOnlyGuard`), and it only reads the git remote.
+
+| | dev | prod |
+|---|---|---|
+| UI | http://localhost:7080 (as alice) | http://localhost:7081 (as carol, deploy only) |
+| brokers | `kafka-dev:9092` (host: `localhost:19092`) | `kafka-prod:9092` (host: `localhost:29092`) |
+| topics | `dmn-emea-street-dev`, `dmn-amer-street-dev` | `dmn-emea-street-prod`, `dmn-amer-street-prod` |
+| drafts | can be tried here | not allowed |
+
+Each instance is configured by plain environment variables (see `docker/entrypoint.sh`):
+`RULES_ENV` (tier), `RULES_ROLE` (author | deployer), `RULES_ALLOW_DRAFT`, `KAFKA_BOOTSTRAP`,
+`RULES_APPS` (`name=file,file[@topic] …`), `RULES_TOPIC_TEMPLATE` (default `dmn-{app}-{env}`),
+`KAFKA_PROPERTIES` (extra client settings), `GIT_REMOTE_URL`, `GIT_USER`, `GIT_TOKEN`, `RULES_USER`.
+The topics are created compacted with one partition by `docker/create-topics.sh`. Set `RULES_APPS`
+in a `.env` file to change the applications for both tiers; `docker compose down -v` starts afresh.

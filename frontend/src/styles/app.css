@@ -1,0 +1,281 @@
+/*
+ * Transit. Releases are a network: main and each release line are routes with their own colour and
+ * bullet, versions are stations, a work space is a branch service that rejoins its line.
+ * White ground, near-black ink, Overpass (road-sign grotesk); Overpass Mono only for rule cells,
+ * values and identifiers. Route colours identify lines; amber, red, green and edit-blue are state
+ * words. The only filled black control on a screen is the next action.
+ */
+@import "tailwindcss";
+
+/*
+ * Overpass, self-hosted, with its vertical metrics corrected: as shipped (ascent 0.883, descent
+ * 0.383, caps 0.70) capitals sit 0.1em low in every line box, so labels, pills and bullets looked
+ * dropped. Ascent 0.983 / descent 0.283 keeps the same line height and centres the caps.
+ */
+@font-face {
+  font-family: "Overpass Transit";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../../node_modules/@fontsource-variable/overpass/files/overpass-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  ascent-override: 98.3%;
+  descent-override: 28.3%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Overpass Transit";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../../node_modules/@fontsource-variable/overpass/files/overpass-latin-ext-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  ascent-override: 98.3%;
+  descent-override: 28.3%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Overpass Mono Transit";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("../../node_modules/@fontsource-variable/overpass-mono/files/overpass-mono-latin-wght-normal.woff2") format("woff2-variations");
+  ascent-override: 98.3%;
+  descent-override: 28.3%;
+  line-gap-override: 0%;
+}
+
+/* Overpass sets the middle dot flush to the next word; every "a · b" in the app borrows a system dot. */
+@font-face {
+  font-family: "Separator Dot";
+  src: local("Helvetica Neue"), local("Helvetica"), local("Segoe UI"), local("Arial");
+  unicode-range: U+00B7;
+}
+
+@theme static {
+  --font-sans: "Separator Dot", "Overpass Transit", system-ui, sans-serif;
+  --font-mono: "Overpass Mono Transit", ui-monospace, Menlo, monospace;
+
+  /* ground and ink */
+  --color-ground: oklch(100% 0 0);
+  --color-platform: oklch(97.2% 0.003 250);
+  --color-ink: oklch(19% 0.01 260);
+  --color-ink-2: oklch(41% 0.012 260);
+  --color-ink-3: oklch(54% 0.01 260);
+  --color-rule: oklch(91% 0.004 260);
+  --color-rule-strong: oklch(81% 0.006 260);
+  --color-hover: oklch(96.5% 0.004 250);
+  --color-select: oklch(95% 0.032 160); /* picked: a tint of the brand */
+  --color-sign: #016c47;
+
+  /* brand: the signage band, main's line, and the one next action (#016c47, white text 6.5:1) */
+  --color-brand: #016c47;
+  --color-brand-hover: oklch(39% 0.09 161);
+  --color-brand-tint: oklch(95.5% 0.03 160);
+
+  /* routes: identity of main and the release lines (see lib/routes.js) */
+  --color-route-main: #016c47; /* main is the brand line */
+  --color-route-1: oklch(47% 0.13 222); /* petrol blue: clear of edit-blue (262) */
+  --color-route-2: oklch(70% 0.17 55);
+  --color-route-3: oklch(47% 0.15 305);
+  --color-route-4: oklch(64% 0.12 205); /* cyan: clear of the brand green (161) and the petrol line (222) by lightness */
+  --color-route-5: oklch(56% 0.21 355);
+  --color-route-6: oklch(50% 0.08 60);
+
+  /* states: always a word, colour reinforces */
+  --color-live: oklch(74% 0.15 72);
+  --color-live-ink: oklch(47% 0.11 60);
+  --color-live-tint: oklch(96.5% 0.04 85);
+  --color-needs: oklch(55% 0.2 27);
+  --color-needs-ink: oklch(49% 0.18 27);
+  --color-needs-tint: oklch(96.5% 0.025 25);
+  --color-edit: oklch(55% 0.17 262);
+  --color-edit-ink: oklch(45% 0.16 262);
+  --color-edit-tint: oklch(95.5% 0.03 262);
+  /* done / passing: a yellower, brighter green than the brand, so "passed" never reads as "press" */
+  --color-clean: oklch(62% 0.17 138);
+  --color-clean-ink: oklch(46% 0.13 138);
+  --color-clean-tint: oklch(96.5% 0.04 135);
+
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.4;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.45;
+  --text-md: 0.875rem;
+  --text-md--line-height: 1.5;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.4;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.25;
+  --text-2xl: 1.875rem;
+  --text-2xl--line-height: 1.1;
+
+  --radius-sm: 3px;
+  --radius: 4px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-turn: turn 700ms linear infinite;
+  @keyframes turn { to { rotate: 360deg; } }
+}
+
+/* --- the page ----------------------------------------------------------------------------------- */
+
+@layer base {
+  :root {
+    --top: 48px;
+    --trail: 56px;
+    --bar: 64px;
+    --gutter: clamp(16px, 2.4vw, 36px);
+    color-scheme: light;
+    /* Short names for the theme colours, used inside SVG attributes and the few hand-written rules. */
+    --page: var(--color-platform);
+    --plane: var(--color-ground);
+    --ink: var(--color-ink);
+    --ink-2: var(--color-ink-2);
+    --ink-3: var(--color-ink-3);
+    --rule: var(--color-rule);
+    --rule-strong: var(--color-rule-strong);
+    --hover: var(--color-hover);
+    --select: var(--color-select);
+    --live: var(--color-live);
+    --live-ink: var(--color-live-ink);
+    --live-tint: var(--color-live-tint);
+    --needs: var(--color-needs);
+    --needs-ink: var(--color-needs-ink);
+    --needs-tint: var(--color-needs-tint);
+    --edit: var(--color-edit);
+    --edit-ink: var(--color-edit-ink);
+    --edit-tint: var(--color-edit-tint);
+    --clean: var(--color-clean);
+    --clean-ink: var(--color-clean-ink);
+    --clean-tint: var(--color-clean-tint);
+    --sans: var(--font-sans);
+    --mono: var(--font-mono);
+    --ease: var(--ease-out);
+  }
+  html, body { height: 100%; }
+  body {
+    @apply bg-ground text-ink font-sans text-md antialiased;
+    font-variant-numeric: tabular-nums;
+    text-rendering: optimizeLegibility;
+  }
+  #app { height: 100%; }
+  ::selection { background: oklch(88% 0.07 160); color: var(--color-ink); }
+  h1, h2, h3 { font-weight: 700; text-wrap: balance; letter-spacing: -0.012em; }
+  h1 { @apply text-2xl; letter-spacing: -0.022em; }
+  h2 { @apply text-xl; }
+  h3 { @apply text-lg; }
+  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  a:hover { text-decoration-thickness: 2px; }
+  :focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; border-radius: 2px; }
+  input, textarea { caret-color: var(--color-brand); }
+  input::placeholder, textarea::placeholder { color: var(--color-ink-3); opacity: 1; }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+  * { scrollbar-width: thin; scrollbar-color: var(--color-rule-strong) transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-rule-strong); border-radius: 10px; border: 3px solid var(--color-ground); }
+  ::-webkit-scrollbar-track { background: transparent; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
+  }
+}
+
+/* --- shared vocabulary -------------------------------------------------------------------------- */
+
+@layer components {
+  .page-body { @apply mx-auto max-w-[1120px] pt-10 pb-14; padding-inline: var(--gutter); }
+  .page-body.wide { max-width: none; }
+  .lede { @apply mt-2 max-w-[66ch] text-lg text-ink-2; }
+
+  .btn {
+    @apply inline-flex h-[34px] items-center gap-1.5 whitespace-nowrap rounded border border-rule-strong bg-ground px-3.5 text-md font-semibold text-ink no-underline;
+    transition: background-color 120ms var(--ease-out), border-color 120ms var(--ease-out), color 120ms var(--ease-out);
+  }
+  .btn:hover:not(:disabled) { @apply border-ink bg-hover; }
+  .btn:disabled { @apply cursor-not-allowed bg-platform text-ink-3; }
+  .btn svg { width: 16px; height: 16px; stroke-width: 1.75; }
+
+  /* The next action: one per screen, black like a line bullet. */
+  .btn-next { @apply h-10 border-brand bg-brand px-5 font-bold text-white; }
+  .btn-next:hover:not(:disabled) { @apply border-brand-hover bg-brand-hover; }
+  .btn-next:disabled { @apply border-rule-strong bg-platform text-ink-3; }
+
+  .btn-quiet { @apply border-transparent bg-transparent px-2 text-ink-2; }
+  .btn-quiet:hover:not(:disabled) { @apply border-transparent bg-hover text-ink; }
+
+  .btn-danger { @apply border-[oklch(82%_0.07_25)] text-needs-ink; }
+  .btn-danger:hover:not(:disabled) { @apply border-needs bg-needs-tint; }
+
+  .btn-small { @apply h-7 px-2.5 text-sm; }
+
+  .btn[aria-busy="true"] { @apply relative cursor-progress; }
+  .btn[aria-busy="true"]::before {
+    content: "";
+    @apply mr-2 inline-block size-3 animate-turn rounded-full border-2 border-current border-r-transparent;
+  }
+
+  .field {
+    @apply block h-9 w-full rounded border border-rule-strong bg-ground px-2.5 text-md text-ink;
+  }
+  .field:focus { @apply border-ink outline-none; box-shadow: 0 0 0 1px var(--color-ink); }
+  textarea.field { @apply h-auto min-h-[84px] resize-y py-2 leading-normal; }
+  select.field { @apply pr-7; }
+  .label { @apply mb-1.5 block text-sm font-semibold text-ink-2; }
+
+  .meta { @apply text-sm text-ink-2; }
+  .mono { @apply font-mono text-[0.92em]; }
+
+  /* State words: always a word, the dot reinforces it. */
+  .state { @apply inline-flex items-center gap-1.5 text-sm font-semibold; }
+  .state::before { content: ""; @apply size-[7px] flex-none rounded-full bg-current; }
+  .state-live { @apply text-live-ink; }
+  .state-live::before { @apply bg-live; }
+  .state-needs { @apply text-needs-ink; }
+  .state-clean { @apply text-clean-ink; }
+  .state-edit { @apply text-edit-ink; }
+  .state-edit::before { @apply bg-edit; }
+  .state-quiet { @apply text-ink-2; }
+  .state-quiet::before { @apply bg-rule-strong; }
+
+  /* Rows between hairlines: the page's only container. */
+  .rows { @apply border-t border-rule; }
+  .rows > * { @apply border-b border-rule; }
+
+  .notice { @apply max-w-[70ch] rounded border border-rule bg-ground px-4 py-3.5; }
+  .notice-needs { @apply border-[oklch(85%_0.06_25)] bg-needs-tint; }
+  .notice-live { @apply border-[oklch(86%_0.08_80)] bg-live-tint; }
+  .notice-clean { @apply border-clean bg-clean-tint; }
+
+  /*
+   * Two shapes, never mixed: an ACTION is a rectangle (.btn: outlined; .btn-next: the one black
+   * filled next action). A LABEL is a pill with a soft fill and no border (.tag for a version,
+   * .ref for a branch or line name) — never black, never outlined, so it is never mistaken for a
+   * button. A label that links somewhere only underlines on hover.
+   */
+  .tag {
+    @apply inline-flex items-center rounded-full bg-platform px-2 font-mono text-[0.78em] font-semibold text-ink no-underline;
+    line-height: 1.75;
+    box-shadow: inset 0 0 0 1px oklch(19% 0.01 260 / 0.06);
+  }
+  a.tag:hover { @apply underline; }
+  .ref {
+    @apply inline-flex items-center gap-1 rounded-full px-2 text-xs font-semibold text-ink no-underline;
+    line-height: 1.6;
+    background: color-mix(in oklch, var(--ref, var(--color-ink-3)) 14%, white);
+  }
+
+  /* A choice among options (a toggle, a pick): an action, so a rectangle; picked = select tint + ink ring. */
+  .btn-option { @apply inline-flex h-7 items-center gap-1.5 rounded border border-rule-strong bg-ground px-2.5 text-sm font-semibold text-ink-2 whitespace-nowrap; }
+  .btn-option:hover:not(:disabled) { @apply border-ink text-ink; }
+  .btn-option.on, .btn-option[aria-pressed="true"], .btn-option[aria-checked="true"] { @apply border-ink bg-select text-ink ring-1 ring-ink; }
+
+  .loading { @apply flex items-center gap-2.5 text-ink-2; }
+  .loading::before {
+    content: "";
+    @apply size-3.5 flex-none animate-turn rounded-full border-2 border-rule-strong border-t-ink;
+  }
+}
+
+/* The column panel docks on the right; the page gives up that width while it is open. */
+body.column-panel-open .stage { margin-right: min(360px, 100vw); }

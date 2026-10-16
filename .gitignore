@@ -33,3 +33,16 @@ Thumbs.db
  
 # Other
 *.swp
+
+frontend/node_modules
+# Runtime data root (DMN/YAML working copies, git checkouts, test runs)
+/data/
+/backend/data/
+
+# Built frontend copied into the backend by copyFrontendToResources
+/backend/src/main/resources/static/
+
+# Impeccable: keep the design record (design.json, surfaces, decisions), not session artefacts
+/.impeccable/review/
+/.impeccable/questions/
+/.impeccable/hook.cache.json

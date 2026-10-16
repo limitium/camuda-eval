@@ -1,0 +1,127 @@
+# Demo: dev and prod, each with its own brokers and its own rules instance, meeting only in one git
+# remote — the same shape as production, where every tier runs in its own network.
+#
+#   docker compose up --build        dev UI on http://localhost:7080, prod UI on http://localhost:7081
+#
+# dev is where rules are authored, tested, released and tried; prod only deploys released versions.
+#
+# Every instance is described by plain variables (see docker/entrypoint.sh): its tier, its brokers,
+# its applications and their topics. Change them here or in a .env file next to this one.
+name: camunda-eval
+
+x-kafka: &kafka
+  image: apache/kafka:3.8.0
+  environment: &kafka-env
+    KAFKA_NODE_ID: 1
+    KAFKA_PROCESS_ROLES: broker,controller
+    KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+    KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,HOST:PLAINTEXT
+    KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+    KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+  healthcheck:
+    test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+    interval: 5s
+    timeout: 10s
+    retries: 30
+
+# The applications both tiers deploy to: name=files[@topic]. Topics default to dmn-{app}-{env}.
+x-apps: &apps ${RULES_APPS:-emea-street=pricing,fees amer-street=pricing}
+
+services:
+  # --- dev tier ----------------------------------------------------------------------------------
+  kafka-dev:
+    <<: *kafka
+    hostname: kafka-dev
+    environment:
+      <<: *kafka-env
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,HOST://:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-dev:9092,HOST://localhost:19092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-dev:9093
+    ports: ["19092:19092"]   # for consumers on the host: localhost:19092
+
+  topics-dev:
+    image: apache/kafka:3.8.0
+    depends_on: { kafka-dev: { condition: service_healthy } }
+    environment:
+      KAFKA_BOOTSTRAP: kafka-dev:9092
+      RULES_ENV: dev
+      RULES_APPS: *apps
+      RULES_TOPIC_TEMPLATE: ${RULES_TOPIC_TEMPLATE:-}   # empty: dmn-{app}-{env}
+    volumes: ["./docker/create-topics.sh:/create-topics.sh:ro"]
+    entrypoint: ["bash", "/create-topics.sh"]
+    restart: "no"
+
+  rules-dev:
+    build: .
+    image: camunda-eval:demo
+    depends_on:
+      git: { condition: service_completed_successfully }
+      topics-dev: { condition: service_completed_successfully }
+    environment:
+      RULES_ENV: dev
+      RULES_ROLE: author
+      RULES_ALLOW_DRAFT: "true"
+      KAFKA_BOOTSTRAP: kafka-dev:9092
+      RULES_APPS: *apps
+      RULES_TOPIC_TEMPLATE: ${RULES_TOPIC_TEMPLATE:-}   # empty: dmn-{app}-{env}
+      GIT_REMOTE_URL: file:///git/rules.git
+      RULES_USER: ${DEV_USER:-alice}   # no proxy in the demo: everyone here is this person
+    volumes: ["rules-git:/git", "dev-data:/data"]
+    ports: ["7080:7070"]
+
+  # --- prod tier: deploy only ---------------------------------------------------------------------------------
+  kafka-prod:
+    <<: *kafka
+    hostname: kafka-prod
+    environment:
+      <<: *kafka-env
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,HOST://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-prod:9092,HOST://localhost:29092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-prod:9093
+    ports: ["29092:29092"]   # for consumers on the host: localhost:29092
+
+  topics-prod:
+    image: apache/kafka:3.8.0
+    depends_on: { kafka-prod: { condition: service_healthy } }
+    environment:
+      KAFKA_BOOTSTRAP: kafka-prod:9092
+      RULES_ENV: prod
+      RULES_APPS: *apps
+      RULES_TOPIC_TEMPLATE: ${RULES_TOPIC_TEMPLATE:-}   # empty: dmn-{app}-{env}
+    volumes: ["./docker/create-topics.sh:/create-topics.sh:ro"]
+    entrypoint: ["bash", "/create-topics.sh"]
+    restart: "no"
+
+  rules-prod:
+    image: camunda-eval:demo
+    depends_on:
+      rules-dev: { condition: service_started }   # same image, built once
+      topics-prod: { condition: service_completed_successfully }
+    environment:
+      RULES_ENV: prod
+      RULES_ROLE: deployer          # no authoring here: pick a released version and deploy it
+      RULES_ALLOW_DRAFT: "false"
+      KAFKA_BOOTSTRAP: kafka-prod:9092
+      RULES_APPS: *apps
+      RULES_TOPIC_TEMPLATE: ${RULES_TOPIC_TEMPLATE:-}   # empty: dmn-{app}-{env}
+      GIT_REMOTE_URL: file:///git/rules.git
+      RULES_USER: ${PROD_USER:-carol}
+    volumes: ["rules-git:/git", "prod-data:/data"]
+    ports: ["7081:7070"]
+
+  # --- where the instances meet --------------------------------------------------------------------
+  # A bare repository on a shared volume; in production, any git server (GIT_REMOTE_URL + GIT_TOKEN).
+  git:
+    image: alpine/git:2.45.2
+    volumes: ["rules-git:/git"]
+    entrypoint: ["sh", "-c", "[ -d /git/rules.git ] || git init --bare --initial-branch=main /git/rules.git"]
+    restart: "no"
+
+volumes:
+  rules-git:
+  dev-data:
+  prod-data:

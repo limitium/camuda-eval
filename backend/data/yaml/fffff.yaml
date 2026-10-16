@@ -1,6 +1,0 @@
-tests:
-  - decision: "Decision_1"
-    description: "Simple test case"
-    in:
-      x: "test"
-    out: "OK"

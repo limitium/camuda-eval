@@ -1,6 +1,9 @@
 # Makefile for Camunda Evaluator with Jib Containerization
 
-.PHONY: help build-backend build-frontend build-all clean run stop logs status check-prereqs
+.PHONY: help build-backend build-frontend build-all clean run stop logs status check-prereqs dev stop-dev
+
+# Environment Variables:
+# BASE_URL - Base path after domain (e.g., myapp) so app is at http://domain/myapp/
 
 # Default target
 help:
@@ -14,6 +17,14 @@ help:
 	@echo "  status            - Show container status"
 	@echo "  clean             - Clean up build artifacts and containers"
 	@echo "  dev               - Start development environment"
+	@echo "  stop-dev          - Stop development environment"
+	@echo ""
+	@echo "Environment Variables:"
+	@echo "  BASE_URL          - Base path after domain (e.g., myapp)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make run BASE_URL=myapp"
+	@echo "  make build-all BASE_URL=myapp"
 
 # Check prerequisites
 check-prereqs:
@@ -55,7 +66,9 @@ build-all: check-prereqs
 # Container management targets
 run:
 	@echo "Running the containerized application..."
-	docker run -d --name camunda-eval -p 7070:7070 -v $(PWD)/data:/data limitium/camunda-eval:latest
+	docker run -d --name camunda-eval -p 7070:7070 -v $(PWD)/data:/data \
+		-e BASE_URL="$(BASE_URL)" \
+		limitium/camunda-eval:latest
 
 stop:
 	@echo "Stopping the containerized application..."
@@ -85,5 +98,22 @@ clean:
 # Development targets
 dev:
 	@echo "Starting development environment..."
-	@echo "Frontend: cd frontend && npm run dev"
-	@echo "Backend: cd backend && ../gradlew run"
+	@echo "Frontend: http://localhost:5173/"
+	@echo "Backend: http://localhost:7070/"
+	@echo ""
+	@echo "Starting frontend and backend concurrently..."
+	@echo "Press Ctrl+C to stop both services"
+	@echo ""
+	@(cd frontend && npm run dev) & \
+	(cd backend && ../gradlew run) & \
+	wait
+
+stop-dev:
+	@echo "Stopping development environment..."
+	@echo "Stopping frontend (Vite) processes..."
+	@pkill -f "vite" || true
+	@echo "Stopping backend (Spring Boot) processes..."
+	@pkill -f "CamundaEvalApplication" || true
+	@echo "Stopping Gradle processes..."
+	@pkill -f "gradlew run" || true
+	@echo "Development environment stopped"
