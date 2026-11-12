@@ -2,29 +2,29 @@
   <div class="page-body" :class="{ wide: result?.status === 'CONFLICTS' }">
     <h1 class="flex flex-wrap items-center gap-3">
       <LineBullet v-if="!refreshing && isLine" :line="from" :main-branch="app.info.mainBranch" size="lg" />
-      <span>{{ refreshing ? 'Refresh onto the newest saved version' : `Bring ${sourceName} in` }}</span>
+      <span>{{ refreshing ? 'Pull the newest commit' : `Merge from ${from}` }}</span>
     </h1>
-    <p v-if="refreshing" class="lede">Someone saved this work space after you started changing it here. Your unsaved changes are combined with their saved version: what only one changed is kept, anything both changed is asked. Afterwards your changes are still unsaved.</p>
-    <p v-else class="lede">{{ capital(sourceName) }} is combined with this work space’s last saved version. What only one changed is taken; anything both changed is asked. The work space moves only when you say so.</p>
+    <p v-if="refreshing" class="lede">Someone committed to {{ ws }} after you started changing it here. Pulling merges your uncommitted changes over their commit: what only one side changed is kept; anything both changed is a conflict you decide. Afterwards your changes are still uncommitted.</p>
+    <p v-else class="lede">{{ from }} is merged with this work space’s last commit. What only one side changed is taken; anything both changed is a conflict you decide. The work space moves only when you say so.</p>
 
-    <p v-if="space.changes.length && !refreshing" class="notice notice-needs mt-7">This work space has unsaved changes. Save a version or undo them first, so nothing of yours is mixed in unnoticed.</p>
+    <p v-if="space.changes.length && !refreshing" class="notice notice-needs mt-7">This work space has uncommitted changes. Commit or undo them first, so nothing of yours is mixed in unnoticed.</p>
     <p v-else-if="error" class="notice notice-needs mt-7">{{ error }}</p>
-    <p v-else-if="!result" class="loading mt-7">Combining {{ sourceName }} with this work space…</p>
+    <p v-else-if="!result" class="loading mt-7">{{ refreshing ? 'Merging your uncommitted changes over the newest commit…' : `Merging ${from} into this work space…` }}</p>
 
     <template v-else>
-      <p v-if="result.status === 'NOTHING_TO_PULL'" class="notice mt-7">This work space already has everything in {{ sourceName }}.</p>
-      <p v-else-if="result.status === 'PULLED'" class="notice notice-clean mt-7">{{ capital(sourceName) }} is in this work space now, as a saved version.</p>
-      <p v-else-if="result.status === 'REFRESHED' || result.status === 'UP_TO_DATE'" class="notice notice-clean mt-7">This work space is at its newest saved version{{ refreshing && result.status === 'REFRESHED' ? ', with your changes still there, unsaved' : '' }}.</p>
+      <p v-if="result.status === 'NOTHING_TO_PULL'" class="notice mt-7">This work space already has everything in {{ from }}.</p>
+      <p v-else-if="result.status === 'PULLED'" class="notice notice-clean mt-7">Merged {{ from }} into this work space, as a merge commit.</p>
+      <p v-else-if="result.status === 'REFRESHED' || result.status === 'UP_TO_DATE'" class="notice notice-clean mt-7">This work space is at its newest commit{{ refreshing && result.status === 'REFRESHED' ? ', with your changes still there, uncommitted' : '' }}.</p>
       <p v-else-if="result.status === 'MOVED'" class="notice notice-needs mt-7">{{ result.message }}</p>
       <template v-else-if="result.status === 'CLEAN'">
-        <p class="notice notice-clean mt-7">Nothing disagrees. {{ refreshing ? 'Your changes and the saved version combine cleanly.' : changedText }}</p>
-        <TestReport v-if="hop?.tests" class="mt-3.5" :report="hop.tests" rev="the combined version" />
-        <p v-if="hop?.tests && !hop.tests.passed" class="meta mt-3.5">Failing tests do not stop bringing changes in — fix them in the work space before landing.</p>
+        <p class="notice notice-clean mt-7">No conflicts. {{ refreshing ? 'Your changes merge cleanly over the newest commit.' : changedText }}</p>
+        <TestReport v-if="hop?.tests" class="mt-3.5" :report="hop.tests" rev="the merge" />
+        <p v-if="hop?.tests && !hop.tests.passed" class="meta mt-3.5">Failing tests do not stop this merge — fix them in the work space before you merge it onward.</p>
       </template>
 
       <template v-if="result.status === 'CONFLICTS'">
         <p class="mt-7">
-          <strong class="font-bold">{{ conflicts.length }} {{ conflicts.length === 1 ? 'thing needs' : 'things need' }} a decision</strong>
+          <strong class="font-bold">{{ conflicts.length }} {{ conflicts.length === 1 ? 'conflict needs' : 'conflicts need' }} a decision</strong>
           <span class="meta"> — {{ answered }} answered.</span>
         </p>
         <Resolver
@@ -32,10 +32,10 @@
           :result="result"
           :resolutions="answers"
           :main-branch="app.info.mainBranch"
-          :space-name="refreshing ? 'your unsaved changes' : 'this work space'"
+          :space-name="refreshing ? 'your uncommitted changes' : 'this work space'"
           :ours-all="refreshing ? 'Keep all of mine' : 'Keep this work space’s'"
-          :theirs-all="refreshing ? 'Take all of the saved version' : `Take all of ${sourceName}`"
-          :theirs-name="refreshing ? 'the saved version' : sourceName"
+          :theirs-all="refreshing ? 'Take all of the newest commit' : `Take all of ${from}`"
+          :theirs-name="refreshing ? 'the newest commit' : from"
           @choose="choose"
         />
       </template>
@@ -52,11 +52,12 @@ import TestReport from '../components/TestReport.vue';
 import { api } from '../lib/api';
 import { useBar } from '../lib/bar';
 import { space } from '../lib/space';
-import { app, branchName, spaceIdFromRoute, spacePath } from '../store';
+import { app, spaceIdFromRoute, spacePath } from '../store';
 
 /*
- * Bringing a line, a version or another space (any instance) into this work space: the same combining
- * and the same answers as landing, and only this work space moves.
+ * Merging main, a release branch, a tag or another work space (any instance) into this work space —
+ * or pulling its own newest commit over uncommitted changes: the same merge and the same answers as
+ * merging onward, and only this work space moves.
  */
 const route = useRoute();
 const router = useRouter();
@@ -69,9 +70,7 @@ const busy = ref(false);
 const stale = ref(false);
 const answers = reactive({});
 
-const capital = (s) => (/^(main|master|release\/|feature\/|hotfix\/)/.test(s) ? s : s.charAt(0).toUpperCase() + s.slice(1));
 const isLine = computed(() => from === app.info.mainBranch || /^release\//.test(from));
-const sourceName = computed(() => branchName(from, app.info.mainBranch));
 const hop = computed(() => result.value?.hops?.[0] || null);
 const conflicts = computed(() => hop.value?.conflicts || []);
 const answered = computed(() => conflicts.value.filter((c) => answers[c.id]).length);
@@ -95,7 +94,7 @@ async function compute(apply = false) {
     result.value = r;
     stale.value = false;
     if (r.status === 'PULLED' || r.status === 'REFRESHED') {
-      app.say(`${capital(sourceName.value)} is in this work space now.`, 'clean');
+      app.say(refreshing ? `Pulled the newest commit of ${ws}.` : `Merged ${from} into ${ws}.`, 'clean');
       space.open(ws);
     }
   } catch (e) {
@@ -119,7 +118,7 @@ useBar(() => {
     const left = conflicts.value.length - answered.value;
     return { secondary, hint: left ? `${left} still to decide.` : null, primary: { label: 'Check with these answers', run: () => compute(false), busy: busy.value, disabled: left > 0 } };
   }
-  if (r.status === 'CLEAN') return { secondary, primary: { label: stale.value ? 'Check again' : refreshing ? 'Refresh' : `Bring ${sourceName.value} in`, run: () => compute(!stale.value), busy: busy.value } };
+  if (r.status === 'CLEAN') return { secondary, primary: { label: stale.value ? 'Check again' : refreshing ? 'Pull' : `Merge from ${from}`, run: () => compute(!stale.value), busy: busy.value } };
   return { secondary, primary: { label: 'Check again', run: () => compute(false), busy: busy.value } };
 });
 </script>

@@ -101,10 +101,10 @@ public class TestExecutionService {
     }
 
     /**
-     * Evaluates one row and asserts every expected output.
+     * Evaluates one row and asserts every expected output, each against the table that gives it.
      *
-     * <p>A single expectation column is compared against the decision's single entry, which is how a
-     * one-output table behaves; several columns are compared against the result map by output name.
+     * <p>Results are read the way DMN gives them: no rule matched gives nothing, one rule its value, and
+     * several (COLLECT, RULE ORDER, OUTPUT ORDER) every value in order — which a list cell, [A, B], expects.
      */
     private void evaluate(DmnEvaluator evaluator, String dmnXml,
                           DecisionTests decision, TestCase testCase) {
@@ -121,51 +121,70 @@ public class TestExecutionService {
         Map<String, String> chainOutputs = new java.util.LinkedHashMap<>(
                 limitium.art.camunda.evaluator.testspec.ChainScope.of(dmnXml, decision.decision, decision.inputColumns).outputs);
         chainOutputs.values().removeIf(decision.decision::equals);
-        dmnXml = scoped;
-        if (decision.outputColumns.stream().anyMatch(chainOutputs::containsKey)) {
-            for (int i = 0; i < decision.outputColumns.size(); i++) {
-                String output = decision.outputColumns.get(i);
-                Object actual;
-                if (chainOutputs.containsKey(output)) {
-                    var upstream = evaluator.loadRuleFromString(dmnXml, chainOutputs.get(output)).evaluate(vars);
-                    actual = upstream.getSingleResult().get(output);
-                } else {
-                    actual = result.getSingleResult().get(output);
-                }
-                assertEqualsNormalized(testCase.expected.get(i), actual, output);
-            }
-            return;
-        }
-
-        if (decision.outputColumns.size() == 1) {
-            Object expected = testCase.expected.get(0);
-            Object actual;
-            if (expected instanceof List<?>) {
-                List<Object> collected = new ArrayList<>();
-                for (var entry : result.getResultList()) {
-                    collected.add(extractSingleEntry(entry));
-                }
-                actual = collected;
-            } else {
-                actual = result.getSingleResult().getSingleEntry();
-            }
-            assertEqualsNormalized(expected, actual, decision.outputColumns.get(0));
-            return;
-        }
-
-        Map<String, Object> actual = result.getSingleResult();
+        Map<String, org.camunda.bpm.dmn.engine.DmnDecisionResult> given = new java.util.HashMap<>();
+        Map<String, String> names = new java.util.HashMap<>();
+        given.put(decision.decision, result);
+        names.put(decision.decision, dec.name());
         for (int i = 0; i < decision.outputColumns.size(); i++) {
             String output = decision.outputColumns.get(i);
-            assertEqualsNormalized(testCase.expected.get(i), actual.get(output), output);
+            String giver = chainOutputs.getOrDefault(output, decision.decision);
+            if (!given.containsKey(giver)) {
+                var upstream = evaluator.loadRuleFromString(scoped, giver);
+                names.put(giver, upstream.name());
+                given.put(giver, upstream.evaluate(vars));
+            }
+            check(testCase.expected.get(i), outputOf(given.get(giver), output), output, names.get(giver));
         }
     }
 
-    private void assertEqualsNormalized(Object expected, Object actual, String output) {
+    /** No rule of the table matched, so it gave nothing. */
+    private static final Object NO_MATCH = new Object();
+
+    /** What a table gave for one output: nothing, one value, or every matched rule's value in order. */
+    private static Object outputOf(org.camunda.bpm.dmn.engine.DmnDecisionResult result, String output) {
+        List<Object> values = new ArrayList<>();
+        for (Map<String, Object> entries : result.getResultList()) {
+            // A one-output table answers under its own name, whatever the column calls it.
+            values.add(entries.containsKey(output) || entries.size() != 1 ? entries.get(output) : entries.values().iterator().next());
+        }
+        if (values.isEmpty()) {
+            return NO_MATCH;
+        }
+        return values.size() == 1 ? values.get(0) : values;
+    }
+
+    /** One expectation against what the table gave, failing in words: what was expected, what came. */
+    private void check(Object expected, Object actual, String output, String table) {
+        if (actual == NO_MATCH) {
+            if (expected == null) {
+                return;
+            }
+            throw new AssertionError(output + ": expected " + shown(expected) + ", but no rule of " + table + " matched");
+        }
+        if (expected instanceof List<?> && !(actual instanceof List<?>)) {
+            actual = Collections.singletonList(actual);
+        }
+        if (!(expected instanceof List<?>) && actual instanceof List<?> many) {
+            throw new AssertionError(output + ": expected " + shown(expected) + ", but " + many.size() + " rules of " + table
+                    + " matched, giving " + shown(actual) + " — expect them all as a list, like [A, B]");
+        }
         try {
             assertEqualsNormalized(expected, actual);
         } catch (AssertionError e) {
-            throw new AssertionError(output + ": " + e.getMessage());
+            throw new AssertionError(output + ": expected " + shown(expected) + ", " + table + " gave " + shown(actual));
         }
+    }
+
+    private static String shown(Object value) {
+        if (value == null) {
+            return "nothing";
+        }
+        if (value instanceof List<?> list) {
+            List<String> parts = new ArrayList<>();
+            list.forEach(v -> parts.add(v == null ? "nothing" : String.valueOf(v)));
+            return "[" + String.join(", ", parts) + "]";
+        }
+        return String.valueOf(value);
     }
 
     private void assertEqualsNormalized(Object expected, Object actual) {
@@ -189,20 +208,6 @@ public class TestExecutionService {
         if (!Objects.equals(expected, actual)) {
             throw new AssertionError("Values differ: expected=" + expected + ", actual=" + actual);
         }
-    }
-
-    private Object extractSingleEntry(Object entry) {
-        if (entry == null) return null;
-        try {
-            java.lang.reflect.Method m = entry.getClass().getMethod("getSingleEntry");
-            return m.invoke(entry);
-        } catch (Exception ignore) {
-            // fall through to the map handling below
-        }
-        if (entry instanceof Map<?, ?> map) {
-            return map.isEmpty() ? null : map.values().iterator().next();
-        }
-        return entry;
     }
 
     /** Builds a concise cause chain, so a parse error reports its root rather than a bare wrapper. */

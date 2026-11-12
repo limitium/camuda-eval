@@ -52,8 +52,6 @@ import java.util.regex.Pattern;
  */
 public class Landing {
 
-    private static final Pattern LINE = Pattern.compile("release/(\\d+)\\.(\\d+)");
-    private static final Pattern VERSION = Pattern.compile("v(\\d+)\\.(\\d+)\\.\\d+");
 
     public static class Refused extends RuntimeException {
         public final String code;
@@ -154,11 +152,11 @@ public class Landing {
             throw new GitRuleStore.NoSuchSpace(id.branch());
         }
         if (space.dirty) {
-            throw new Refused("UNSAVED", "there are changes that are not in a saved version; only saved versions land");
+            throw new Refused("UNSAVED", "there are changes that are not committed; only committed changes are merged");
         }
         String shared = store.sharedHead(id);
         if (shared == null || !shared.equals(space.head)) {
-            throw new Refused("NOT_SHARED", "the last saved version has not been shared yet — save the version again to share it");
+            throw new Refused("NOT_SHARED", "the last commit has not been shared yet — commit again to share it");
         }
         if (sync.enabled()) {
             sync.run(); // check and land against what every instance sees, never a stale copy
@@ -176,7 +174,7 @@ public class Landing {
             result.target = space.targetLine;
 
             return landChain(repository, inserter, result, chain, baseline, ObjectId.fromString(space.head), id.branch(),
-                    "Land " + id.branch() + " into ", false, chosen, expectedTips, apply, by);
+                    "Merge " + id.branch() + " into ", false, chosen, expectedTips, apply, by);
         } finally {
             lifecycle.unlock();
         }
@@ -201,7 +199,7 @@ public class Landing {
                 hop.from = incomingName;
                 hop.provisional = earlierOpen;
                 ObjectId tip = repository.resolve(Constants.R_HEADS + line);
-                if (tip == null && i == 0 && baseline[0] != null && VERSION.matcher(baseline[0]).matches()) {
+                if (tip == null && i == 0 && baseline[0] != null && ReleaseNames.isTag(baseline[0])) {
                     tip = repository.resolve(Constants.R_TAGS + baseline[0] + "^{commit}");
                     hop.createsLine = true;
                 }
@@ -216,7 +214,7 @@ public class Landing {
                     if (i == 0 && !carrying) {
                         result.hops.add(hop);
                         result.status = "NOTHING_TO_LAND";
-                        result.message = lineName(line) + " already has everything this space saved";
+                        result.message = line + " already has everything this space committed";
                         return result;
                     }
                     incoming = tip;
@@ -230,7 +228,7 @@ public class Landing {
                 Map<String, byte[]> merged = mergeDomains(repository, hop, hopKey, base, tip, incoming, chosen);
                 attribute(repository, hop, hopKey, base, tip, incoming);
                 ObjectId commit = commit(repository, inserter, tip, incoming, merged,
-                        (i == 0 && !carrying ? firstMessage + line : "Carry " + incomingName + " forward into " + line), by);
+                        (i == 0 && !carrying ? firstMessage + line : "Merge " + incomingName + " into " + line), by);
                 hop.result = commit.getName();
                 if (hop.conflicts.isEmpty() && !earlierOpen) {
                     hop.tests = gate.run(commit.getName());
@@ -254,7 +252,7 @@ public class Landing {
             }
             if (expectedTips != null && !expectedTips.isEmpty() && !expectedTips.equals(result.tips)) {
                 result.status = "MOVED";
-                result.message = "a line moved while you were deciding; your answers are kept — look at what changed";
+                result.message = "a branch moved while you were deciding; your answers are kept — look at what changed";
                 return result;
             }
             List<RefTransaction.Move> moves = new ArrayList<>();
@@ -293,8 +291,8 @@ public class Landing {
              ObjectInserter inserter = git.getRepository().newObjectInserter()) {
             Repository repository = git.getRepository();
             ObjectId tip = repository.resolve(Constants.R_HEADS + line);
-            if (tip == null || !LINE.matcher(line).matches()) {
-                throw new Refused("NO_LINE", "there is no release line " + line);
+            if (tip == null || !ReleaseNames.isBranch(line)) {
+                throw new Refused("NO_LINE", "there is no release branch " + line);
             }
             Result result = new Result();
             result.space = line;
@@ -308,7 +306,7 @@ public class Landing {
                 }
                 if (!anything) {
                     done.status = "NOTHING_TO_LAND";
-                    done.message = lineName(line) + " is already in every newer line and main";
+                    done.message = line + " is already merged into every newer release branch and main";
                 }
             }
             return done;
@@ -335,7 +333,7 @@ public class Landing {
             throw new GitRuleStore.NoSuchSpace(id.branch());
         }
         if (space.dirty) {
-            throw new Refused("UNSAVED", "there are unsaved changes in this space; save or undo them first, then bring the changes in");
+            throw new Refused("UNSAVED", "there are uncommitted changes in this space; commit or undo them first, then merge");
         }
         if (sync.enabled()) {
             sync.run();
@@ -352,7 +350,7 @@ public class Landing {
                 theirs = repository.resolve(from + "^{commit}");
             }
             if (theirs == null) {
-                throw new Refused("NO_SUCH_SOURCE", "there is no " + from + " to bring in");
+                throw new Refused("NO_SUCH_SOURCE", "there is no " + from + " to merge from");
             }
             Result result = new Result();
             result.space = id.branch();
@@ -374,7 +372,7 @@ public class Landing {
             hop.base = base == null ? null : base.getName();
             Map<String, byte[]> merged = mergeDomains(repository, hop, id.branch(), base, ours, theirs, chosen);
             attribute(repository, hop, id.branch(), base, ours, theirs);
-            ObjectId commit = commit(repository, inserter, ours, theirs, merged, "Bring " + from + " into " + id.branch(), by);
+            ObjectId commit = commit(repository, inserter, ours, theirs, merged, "Merge " + from + " into " + id.branch(), by);
             hop.result = commit.getName();
             if (hop.conflicts.isEmpty()) {
                 hop.tests = gate.run(commit.getName());
@@ -386,7 +384,7 @@ public class Landing {
             }
             if (expectedHead != null && !expectedHead.isEmpty() && !expectedHead.equals(space.head)) {
                 result.status = "MOVED";
-                result.message = "this space was saved again meanwhile; your answers are kept — look again";
+                result.message = "this space has a newer commit meanwhile; your answers are kept — look again";
                 return result;
             }
             try {
@@ -432,7 +430,7 @@ public class Landing {
         result.tips.put(id.branch(), saved == null ? "" : saved);
         if (saved == null || saved.equals(here)) {
             result.status = "UP_TO_DATE";
-            result.message = "this space is already at its newest saved version";
+            result.message = "this space is already at its newest commit";
             return result;
         }
         boolean follows;
@@ -462,7 +460,7 @@ public class Landing {
             }
             asChanges.putAll(working);
             String instance = store.instance().isEmpty() ? "this instance" : store.instance();
-            ObjectId ours = commitOn(repository, inserter, head, asChanges, "Unsaved changes on " + instance, by, head);
+            ObjectId ours = commitOn(repository, inserter, head, asChanges, "Uncommitted changes on " + instance, by, head);
             ObjectId theirs = ObjectId.fromString(saved);
 
             Hop hop = new Hop();
@@ -633,24 +631,18 @@ public class Landing {
         if (target.equals(main)) {
             return chain;
         }
-        Matcher t = LINE.matcher(target);
-        if (!t.matches()) {
+        int[] t = ReleaseNames.ofBranch(target);
+        if (t == null) {
             chain.add(main);
             return chain;
         }
+        // Every newer release branch, by version order — release/1.0.1 before release/1.1.
         TreeMap<String, String> newer = new TreeMap<>();
-        for (org.eclipse.jgit.lib.Ref ref : repository.getRefDatabase().getRefsByPrefix(Constants.R_HEADS + "release/")) {
+        for (org.eclipse.jgit.lib.Ref ref : repository.getRefDatabase().getRefsByPrefix(Constants.R_HEADS + ReleaseNames.PREFIX)) {
             String branch = ref.getName().substring(Constants.R_HEADS.length());
-            Matcher m = LINE.matcher(branch);
-            if (!m.matches()) {
-                continue;
-            }
-            int cmp = Integer.compare(Integer.parseInt(m.group(1)), Integer.parseInt(t.group(1)));
-            if (cmp == 0) {
-                cmp = Integer.compare(Integer.parseInt(m.group(2)), Integer.parseInt(t.group(2)));
-            }
-            if (cmp > 0) {
-                newer.put(String.format("%06d.%06d", Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2))), branch);
+            int[] m = ReleaseNames.ofBranch(branch);
+            if (m != null && ReleaseNames.compare(m, t) > 0) {
+                newer.put(ReleaseNames.branchKey(branch), branch);
             }
         }
         chain.addAll(newer.values());
@@ -721,7 +713,7 @@ public class Landing {
                                 "the domain " + domain + " was removed on one side and changed on the other",
                                 oursHas ? Arrays.asList(choice(Resolution.OURS, "keep " + domain + ", with the changes"), choice(Resolution.THEIRS, "remove " + domain))
                                         : Arrays.asList(choice(Resolution.OURS, "keep " + domain + " removed"), choice(Resolution.THEIRS, "keep " + domain + ", with the changes")),
-                                "removing a domain stops it running everywhere this version is deployed", attribution));
+                                "removing a domain stops it running everywhere it is deployed", attribution));
                         change.conflicts++;
                     }
                     if (keep && !oursHas) {
@@ -749,7 +741,7 @@ public class Landing {
                     } else if (r == null) {
                         hop.conflicts.add(conflict(hop, domain, prefix + cid, MergeConflict.Kind.DOMAIN_ADD_ADD.name(),
                                 "a domain called " + domain + " was created on both sides, differently",
-                                Arrays.asList(choice(Resolution.OURS, "keep " + lineName(hop.into) + "’s"), choice(Resolution.THEIRS, "take " + hop.from + "’s")),
+                                Arrays.asList(choice(Resolution.OURS, "keep " + hop.into + "’s"), choice(Resolution.THEIRS, "take " + hop.from + "’s")),
                                 "its name is the key the running app reads it by, so only one can exist", attribution));
                         change.conflicts++;
                     }
@@ -988,9 +980,5 @@ public class Landing {
         ObjectId id = inserter.insert(commit);
         inserter.flush();
         return id;
-    }
-
-    private String lineName(String branch) {
-        return branch.equals(store.properties().getMainBranch()) ? branch : branch.replace("release/", "release ");
     }
 }

@@ -195,7 +195,7 @@ public class WorkspacesController {
         try {
             byte[] content = store.readAt(id.branch(), path);
             if (content == null) {
-                return error(HttpStatus.NOT_FOUND, "not in the last saved version");
+                return error(HttpStatus.NOT_FOUND, "not in the last commit");
             }
             return ResponseEntity.ok()
                     .contentType(org.springframework.http.MediaType.TEXT_PLAIN)
@@ -328,9 +328,13 @@ public class WorkspacesController {
             return baseline;
         }
         if (kindOf(baseline) == WorkspaceId.Kind.HOTFIX) {
-            String[] parts = baseline.substring(1).split("\\.");
-            if (parts.length >= 2) {
-                return "release/" + parts[0] + "." + parts[1];
+            try {
+                String branch = store.releaseBranchOf(baseline);
+                if (branch != null) {
+                    return branch;
+                }
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
             }
         }
         return properties.getMainBranch();

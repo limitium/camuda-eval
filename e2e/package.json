@@ -1,0 +1,9 @@
+{
+  "name": "camunda-eval-e2e",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end check before a release: a fresh dev+prod stack, driven in Chrome. Run ./run.sh",
+  "dependencies": {
+    "puppeteer-core": "25.16.0"
+  }
+}

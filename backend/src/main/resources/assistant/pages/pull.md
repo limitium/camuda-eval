@@ -1,0 +1,1 @@
+**Pull / merge into the work space.** Brings a newer commit of this work space, or another branch, into it. What only one side changed is taken; anything both changed is a conflict to decide (pick one side per conflict), then **Check with these answers**, then the button at the bottom right (**Pull**, or **Merge from** and the branch's name). Uncommitted changes stay uncommitted.

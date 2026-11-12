@@ -1,7 +1,7 @@
 <template>
   <div class="page-body">
     <h1>Applications on {{ app.info.env }}</h1>
-    <p class="lede">The applications this instance deploys rules to, and what each runs now — read from its topic. Open one to look at and try what runs, start a work space from it, or deploy.</p>
+    <p class="lede">The applications this instance deploys rules to, and what each runs now — read from its topic. {{ app.author ? 'Open one to look at and try what runs, start a work space from it, or deploy.' : 'Open one to look at what runs, run its tests, or deploy a tag.' }}</p>
     <SyncLine class="mt-3" @changed="load" />
 
     <p v-if="error" class="notice notice-needs mt-7">{{ error }}</p>
@@ -57,6 +57,7 @@ import LineBullet from '../components/LineBullet.vue';
 import SyncLine from '../components/SyncLine.vue';
 import { api } from '../lib/api';
 import { useBar } from '../lib/bar';
+import { useAssistant } from '../lib/assistant';
 import { app, branchName, lineName, whenText } from '../store';
 
 /* The home: every application this instance controls, and what it runs now. */
@@ -72,9 +73,9 @@ const shared = computed(() => {
 });
 
 const health = (d) => (!d.ok ? 'down' : d.problems?.length || !d.inStep ? 'warn' : 'ok');
-const healthText = (d) => (!d.ok ? d.error : d.problems?.length ? d.problems.join('; ') : d.inStep ? 'in step' : 'its files run different versions — redeploy');
+const healthText = (d) => (!d.ok ? d.error : d.problems?.length ? d.problems.join('; ') : d.inStep ? 'in step' : 'its files run different commits — redeploy');
 
-// The line a version runs on: release/M.m for a release vM.m.p; a draft runs on the line it lands in.
+// The branch what runs belongs to: release/M.m for a tag vM.m.p; a draft, the branch it merges into.
 function lineOf(v) {
   if (!v) return null;
   if (v.line) return v.line;
@@ -93,6 +94,14 @@ async function load() {
 }
 
 onMounted(load);
+
+useAssistant(() => ({
+  places: Object.fromEntries((apps.value || []).map((d) => [d.name, `/applications/${d.name}`])),
+  applications: error.value ? `could not be read: ${error.value}` : !apps.value ? 'still being read'
+    : apps.value.map((d) => `${d.name} — reads ${d.files.join(', ')}; ${!d.ok ? 'problem: its topic cannot be read'
+      : !d.version ? 'nothing deployed'
+        : d.version.release ? `runs tag ${d.version.release}` : `runs a draft of ${d.version.workspace}`}${d.version ? `, deployed by ${d.version.publishedBy} ${whenText(d.version.publishedAt)}` : ''}${health(d) === 'warn' ? ` (problem: ${healthText(d)})` : ''}`)
+}));
 
 useBar(() => (app.author
   ? { primary: { label: 'Go to work spaces', run: () => router.push('/work') } }

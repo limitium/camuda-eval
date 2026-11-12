@@ -275,6 +275,74 @@ class LifecycleTest {
     }
 
     @Test
+    @DisplayName("the next line also opens from the newest release line, after where that line started")
+    void openLineFromTheNewestLine() throws Exception {
+        String first = store.resolve("refs/heads/main");
+        releases.openLine(first, null, "alice");
+        WorkspaceId fix = spaceWith("fix", "release/1.0", "release/1.0", "6%");
+        assertEquals("LANDED", landing.land(fix, null, null, true, "alice").status);
+        String onLine = store.resolve("refs/heads/release/1.0");
+        assertEquals("NOT_AFTER_PREVIOUS", assertThrows(Releases.Refused.class, () -> releases.openLine(first, "1.1", "alice")).code);
+        assertEquals("release/1.1", releases.openLine(onLine, null, "alice").get("line"));
+        assertEquals(onLine, store.resolve("refs/heads/release/1.1"));
+        // 1.1 started where it was opened: the next line cannot start there too, nor from release 1.0
+        assertEquals("NOT_AFTER_PREVIOUS", assertThrows(Releases.Refused.class, () -> releases.openLine(onLine, "1.2", "alice")).code);
+        assertEquals(onLine, releases.lines().get(0).opensAfter, "main says where the next line opens after");
+    }
+
+    @Test
+    @DisplayName("tags are named freely, in version order on their branch")
+    void tagsInVersionOrder() throws Exception {
+        String first = store.resolve("refs/heads/main");
+        releases.openLine(first, "1.0", null, "alice");
+        assertEquals("BAD_VERSION", assertThrows(Releases.Refused.class,
+                () -> releases.release("release/1.0", first, "one", null, "alice", true)).code);
+        assertEquals("BELOW_BRANCH", assertThrows(Releases.Refused.class,
+                () -> releases.release("release/1.0", first, "0.9.0", null, "alice", true)).code);
+        assertEquals("ABOVE_BRANCH", assertThrows(Releases.Refused.class,
+                () -> releases.release("release/1.0", first, "1.1.0", null, "alice", true)).code, "a newer minor needs its own release branch");
+        assertEquals("v1.0.2", releases.release("release/1.0", first, "1.0.2", "skip two", "alice", false).get("version"));
+        assertEquals("release/1.0", releases.lines().stream().filter(l -> l.branch.equals("release/1.0")).findFirst().get().versions.get(0).branch,
+                "the tag records the branch it was made on");
+        WorkspaceId fix = spaceWith("fix", "release/1.0", "release/1.0", "6%");
+        assertEquals("LANDED", landing.land(fix, null, null, true, "alice").status);
+        String fixed = store.resolve("refs/heads/release/1.0");
+        assertEquals("NOT_AFTER_LAST_TAG", assertThrows(Releases.Refused.class,
+                () -> releases.release("release/1.0", fixed, "v1.0.1", null, "alice", true)).code);
+        releases.openLine(fixed, "1.1", "release/1.0", "alice");
+        assertEquals("ABOVE_BRANCH", assertThrows(Releases.Refused.class,
+                () -> releases.release("release/1.0", fixed, "v1.1.0", null, "alice", true)).code, "v1.1.x belongs to release/1.1");
+        assertEquals("VERSION_TAKEN", assertThrows(Releases.Refused.class,
+                () -> releases.release("release/1.1", fixed, "v1.0.2", null, "alice", true)).code);
+        assertEquals("v1.0.3", releases.release("release/1.0", fixed, null, null, "alice", true).get("version"), "suggested: after the newest tag");
+    }
+
+    @Test
+    @DisplayName("a release branch is created from a release branch, numbered above it, and merges in version order")
+    void patchBranchFromARelease() throws Exception {
+        String first = store.resolve("refs/heads/main");
+        releases.openLine(first, "1.0", null, "alice");
+        WorkspaceId fix = spaceWith("fix", "release/1.0", "release/1.0", "6%");
+        assertEquals("LANDED", landing.land(fix, null, null, true, "alice").status);
+        String onTen = store.resolve("refs/heads/release/1.0");
+        releases.openLine(onTen, "1.1", "release/1.0", "alice");
+        assertEquals("NOT_AFTER_SOURCE", assertThrows(Releases.Refused.class,
+                () -> releases.openLine(onTen, "0.9", "release/1.0", "alice")).code);
+        assertEquals("BAD_NUMBER", assertThrows(Releases.Refused.class,
+                () -> releases.openLine(onTen, "1.x", "release/1.0", "alice")).code);
+        assertEquals("LINE_EXISTS", assertThrows(Releases.Refused.class,
+                () -> releases.openLine(onTen, "1.1.0", "release/1.0", "alice")).code, "1.1.0 is the number of release/1.1");
+        assertEquals("release/1.0.1", releases.lines().stream().filter(l -> l.branch.equals("release/1.0")).findFirst().get().nextBranch,
+                "with release/1.1 taken, release/1.0 suggests its next patch");
+        assertEquals("release/1.0.1", releases.openLine(onTen, "1.0.1", "release/1.0", "alice").get("line"));
+        WorkspaceId patch = spaceWith("patch", "release/1.0.1", "release/1.0.1", "7%");
+        Landing.Result result = landing.land(patch, null, null, true, "alice");
+        assertEquals("LANDED", result.status, String.valueOf(result.message));
+        assertEquals(List.of("release/1.0.1", "release/1.1", "main"), result.hops.stream().map(h -> h.into).toList(),
+                "release/1.0.1 sits between release/1.0 and release/1.1");
+    }
+
+    @Test
     @DisplayName("a fix to the oldest line is carried through every newer line and main in one step")
     void wholeChain() throws Exception {
         cut("1.0");

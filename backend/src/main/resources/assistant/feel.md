@@ -1,0 +1,56 @@
+# Writing cells (FEEL, as this engine reads it — Camunda 7.17; every form below was run on it)
+- Text is ALWAYS in double quotes: `"EU"`. A word without quotes is an input's name.
+- A condition cell tests its column's value; write `?` for that value inside a function.
+- A result cell gives one value; `null` gives no value.
+## Condition cells
+- `-` any value, also none
+- `"EU"` exactly EU (case matters); `"EU","UK"` EU or UK
+- `not("EU","UK")` neither EU nor UK
+- `100` exactly 100; `100, 200, 300` any of them
+- `>= 1000000` compare; also `<`, `<=`, `>`
+- `[100..500]` 100 to 500 both included; `[100..500)` excludes 500; `(100..500]` excludes 100
+- `< 0, > 100` under 0 or over 100
+- `? between 1 and 5 or ? between 10 and 20` in either range; `? > 10 and ? < 20` both
+- `> limit` compare with the input limit
+- `true` yes; `false` no; `null` no value; `not(null)` any value
+- `starts with(?, "DE")`, `ends with(?, "-OTC")`, `contains(?, "OTC")` text tests
+- `not(starts with(?, "DE"))` text not starting with DE
+- `matches(?, "^[A-Z]{2}$")` text matching a pattern
+- `upper case(?) = "EU"` EU in any case; `string length(?) = 2` two characters; `modulo(?, 100) = 0` a multiple of 100
+## Condition cells in a date column (it holds a date and a time)
+- `>= date and time("2025-01-01")` on or after 1 Jan 2025
+- `[date and time("2025-01-01")..date and time("2025-02-01"))` in January 2025
+- `date(?) = date("2025-01-31")` on 31 Jan 2025, any time
+- `date(?) < today()` before today; `date(?) >= today() - duration("P30D")` from 30 days ago on
+- `?.year = 2025` in 2025; `?.weekday >= 6` weekend; `day of week(?) = "Friday"`
+## Result cells
+- `"Gold"` text; `0.05` number; `true` yes; `null` no value; `market` an input's value
+- `amount * 0.002`, `(amount + fee) * 2`, `modulo(amount, 7)` arithmetic
+- `max(10, min(amount * 0.001, 25))` kept between 10 and 25
+- `decimal(amount * 0.0015, 2)` two places (a half goes to the even digit)
+- `floor(amount * 100 + 0.5) / 100` two places, a half always up
+- `floor(amount / 1000)`, `ceiling(amount / 1000)` whole thousands down / up
+- `"FEE-" + market` joined text; `"FEE-" + string(amount)` a number in text
+- `upper case(market)`, `substring(code, 1, 2)`, `substring before(code, "-")`, `split(code, "-")[2]`, `replace(code, "-", "")`
+- `if amount > 1000 then "LARGE" else "SMALL"` (else is required)
+- `if amount > 1000 then "L" else if amount > 100 then "M" else "S"`
+- `if market in ["OTC", "EU"] then 1 else 0`
+- `if amount between 1000 and 2000 then "MID" else "OTHER"`
+- `if fee = null then 0 else fee` no value counts as 0
+- `get value({EU: 0.1, UK: 0.2}, market)` look up by name
+- `date and time("2025-01-31")` in a date result
+- `date and time(trade) + duration("P30D")` a date input in a result must be wrapped in date and time()
+## Never write (wrong → right)
+- `EU` or `'EU'` → `"EU"`; `"EU" or "UK"` → `"EU","UK"` (silently never matches)
+- `= 100` → `100`; `!= "EU"` → `not("EU")`; `1,000` → `1000`; `10%` → `0.1`
+- `100..500` → `[100..500]`; `100-500` → `[100..500]` (silently means minus 400)
+- `[1..5],[10..20]` → `? between 1 and 5 or ? between 10 and 20`; `not([100..500])` → `< 100, > 500`
+- `contains("OTC")` → `contains(?, "OTC")`; `? = true` → `true`; `not(true)` → `false`; `TRUE` → `true`
+- `-` in a result → an empty cell; `JP-LRG` → `"JP-LRG"` (silently no value)
+- `"0.05"` in a number result → `0.05`; `"FEE-" + amount` → `"FEE-" + string(amount)` (silently no value)
+- `round(amount, 2)` → `decimal(amount, 2)`; `floor(amount, 2)` → `floor(amount * 100) / 100`; `amount % 7` → `modulo(amount, 7)`
+- `trim(code)` → `replace(code, "^ +| +$", "")`; `market == "OTC"` → `market = "OTC"`; `&&` / `||` → `and` / `or`
+- `if amount > 1000 then "L"` → `if amount > 1000 then "L" else null`; `if amount in [1000..2000] then "MID" else "OTHER"` → `if amount between 1000 and 2000 then "MID" else "OTHER"`
+- `date("2025-01-31")` or `"2025-01-31"` in a date column or date result → `date and time("2025-01-31")`
+- `< today()` in a date column → `date(?) < today()`; `trade.year` in a result → `date and time(trade).year`
+- `duration("P2W")` → `duration("P14D")`; `date and time("2025-01-31 10:30:00")` → `date and time("2025-01-31T10:30:00")`

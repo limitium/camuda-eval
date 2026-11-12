@@ -6,8 +6,8 @@
     <p v-if="error" class="notice notice-needs mt-7">{{ error }}</p>
     <p v-else-if="!bases" class="loading mt-7">Fetching the newest of every branch…</p>
 
-    <!-- The choices and the network side by side: both columns start on the same line. -->
-    <div v-else class="mt-7 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-10 max-[1200px]:grid-cols-1">
+    <!-- The choices and the graph side by side: both columns start on the same line. -->
+    <div v-else class="mt-7 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-10 @max-[1200px]:grid-cols-1">
       <div class="min-w-0">
         <div class="max-w-[520px]">
           <label class="label" for="space-name">Name</label>
@@ -23,14 +23,14 @@
               <LineBullet :line="landsIn" :main-branch="app.info.mainBranch" size="sm" :title="lineName(landsIn, app.info.mainBranch)" />
               <span class="min-w-0 font-semibold">“{{ plainMessage(atCommit.message.split('\n')[0], app.info.mainBranch) }}”</span>
             </span>
-            <span class="col-start-2 text-sm text-ink-2">one commit on {{ branchName(atCommit.lane, app.info.mainBranch) }}, not its newest · lands in {{ lineName(landsIn, app.info.mainBranch) }}</span>
+            <span class="col-start-2 text-sm text-ink-2">one commit on {{ branchName(atCommit.lane, app.info.mainBranch) }}, not its newest · merges into {{ lineName(landsIn, app.info.mainBranch) }}</span>
             <span class="col-start-2 text-xs text-ink-3">{{ atCommit.author }}, {{ whenText(atCommit.when) }} · <span class="mono">{{ atCommit.sha.slice(0, 7) }}</span></span>
           </div>
           <div v-else-if="picked" class="grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-x-4 gap-y-0.5 px-1 py-3">
             <span class="text-sm font-bold text-ink-2">Builds on</span>
             <span class="flex min-w-0 items-center gap-2">
               <LineBullet :line="pickedLine" :main-branch="app.info.mainBranch" size="sm" :title="lineName(pickedLine, app.info.mainBranch)" />
-              <span class="min-w-0 font-semibold">{{ capital(branchName(picked.ref, app.info.mainBranch)) }}</span>
+              <span class="min-w-0 font-semibold">{{ picked.ref }}</span>
             </span>
             <span class="col-start-2 text-sm text-ink-2">{{ landsText(picked) }}</span>
             <span class="col-start-2 text-xs text-ink-3">newest: “{{ plainMessage(picked.message, app.info.mainBranch) }}” — {{ picked.by }}{{ picked.savedOn ? ` on ${picked.savedOn}` : '' }}, {{ whenText(picked.when) }}</span>
@@ -42,7 +42,7 @@
         </div>
       </div>
 
-      <div ref="graphSide" class="sticky grid min-w-0 gap-2.5 max-[1200px]:static" :style="{ top: `${stickTop}px` }">
+      <div ref="graphSide" class="sticky grid min-w-0 gap-2.5 @max-[1200px]:static" :style="{ top: `${stickTop}px` }">
         <BranchGraph
           v-if="history"
           :history="history"
@@ -71,7 +71,7 @@ import LineBullet from '../components/LineBullet.vue';
 import { api } from '../lib/api';
 import { useBar } from '../lib/bar';
 import { useStickyFit } from '../lib/stickyFit';
-import { app, branchName, branchSlug, lineName, plainMessage, spacePath, whenText } from '../store';
+import { app, branchName, branchSlug, lineName, plainMessage, spacePath, startLineOf, whenText } from '../store';
 
 /* One screen: choose what the work space builds on (each at its newest commit, fetched first) and name it. */
 const route = useRoute();
@@ -81,25 +81,26 @@ const error = ref(null);
 const from = ref(String(route.query.from || ''));
 const name = ref(String(route.query.name || ''));
 const busy = ref(false);
-// Set when one commit is picked: the branch it is on, which decides where the work space lands.
+// Set when one commit is picked: the branch it is on, which decides where the work space merges.
 const on = ref(String(route.query.on || ''));
 const history = ref(null);
 const graphSide = ref(null);
 const stickTop = useStickyFit(graphSide);
 
-const capital = (s) => (/^(main|master|release\/|feature\/|hotfix\/)/.test(s) ? s : s.charAt(0).toUpperCase() + s.slice(1));
 const picked = computed(() => (bases.value || []).find((b) => b.ref === from.value) || null);
 const atCommit = computed(() => (on.value && history.value?.commits.find((c) => c.sha === from.value)) || null);
-// Like the branch it was picked on: a space's commit lands where that space lands, a line's on that line.
+// Like the branch it was picked on: a space's commit merges where that space merges, a release branch's into it.
 const landsIn = computed(() => (bases.value || []).find((b) => b.ref === on.value)?.targetLine || (on.value.startsWith('release/') ? on.value : app.info.mainBranch));
-// The line a picked branch runs on: a line itself, or the line a work space lands in.
+// The colour a picked branch runs in: main or a release branch itself, or the one a work space merges into.
 const pickedLine = computed(() => (picked.value?.kind === 'SPACE' ? picked.value.targetLine || app.info.mainBranch : picked.value?.ref || app.info.mainBranch));
 function pickLane(ref) {
   on.value = '';
   from.value = ref;
 }
-// The newest commit of a branch is that branch; any other commit is started from exactly.
+// The newest commit of a branch is that branch — of several release branches, the last — and any other commit is started from exactly.
 function pickCommit(c) {
+  const line = startLineOf(c, app.info.mainBranch);
+  if (line && (c.tips || []).includes(line)) return pickLane(line);
   if ((c.tips || []).includes(c.lane)) return pickLane(c.lane);
   on.value = c.lane;
   from.value = c.sha;
@@ -117,7 +118,7 @@ const valid = computed(() => slug.value.length > 0);
 // A fix to a release stays a fix: building on a hotfix work space makes another hotfix.
 const kind = computed(() => ((on.value || from.value).startsWith('hotfix/') ? 'hotfix' : 'feature'));
 const branch = computed(() => `${kind.value}/${app.info.user}/${slug.value || '…'}`);
-const landsText = (b) => (b.kind === 'SPACE' ? `someone’s work in progress, landing in ${lineName(b.targetLine, app.info.mainBranch)}` : b.kind === 'MAIN' ? 'new work, released in the next release' : 'a fix to what this release runs, carried forward to main');
+const landsText = (b) => (b.kind === 'SPACE' ? `someone’s work in progress, merging into ${lineName(b.targetLine, app.info.mainBranch)}` : b.kind === 'MAIN' ? 'new work, released in the next release' : `a fix to what this release runs, merged into newer branches and ${app.info.mainBranch}`);
 
 onMounted(async () => {
   try {

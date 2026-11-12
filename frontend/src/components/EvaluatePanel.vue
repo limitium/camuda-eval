@@ -2,10 +2,8 @@
   <section class="evaluate grid gap-3.5 border-t border-rule pt-5" :aria-label="`Try ${decision.name}`">
     <header class="flex flex-wrap items-baseline gap-x-4 gap-y-1.5">
       <h3>Try it</h3>
-      <p class="meta">Evaluates what is on screen{{ edited ? ', including changes not saved' : '' }}. Nothing is saved.</p>
+      <p class="meta">{{ focused && chain.length > 1 ? `Runs ${decision.name} the way DMN does: with ${chain.length - 1 === 1 ? 'the table' : `the ${chain.length - 1} tables`} it requires.` : '' }} Evaluates what is on screen{{ edited ? ', including changes not saved' : '' }}. Nothing is saved.</p>
     </header>
-
-    <RunPicker v-model="runIds" :decisions="decisions" :focus="defaultScope === 'whole' ? null : decision" />
 
     <form class="flex flex-wrap items-end gap-x-4 gap-y-3" @submit.prevent="run">
       <div v-for="v in variables" :key="v.name" class="grid min-w-[150px]">
@@ -24,7 +22,7 @@
 
     <div v-if="steps.length" class="grid gap-4" aria-live="polite">
       <!-- One line per group of connected tables: unrelated tables are never drawn as a chain. Each
-           table that ran is a station; an arrow between two says the later one uses the earlier. -->
+           table that ran is a node; an arrow between two says the later one uses the earlier. -->
       <ol v-for="(g, gi) in stepGroups" :key="gi" class="m-0 grid max-w-[80ch] list-none border-t border-rule p-0">
         <li
           v-for="(s, i) in g"
@@ -58,15 +56,14 @@
 import { computed, reactive, ref, watch } from 'vue';
 import { ArrowDown } from 'lucide-vue-next';
 import { api } from '../lib/api';
-import RunPicker from './RunPicker.vue';
-import { groupsOf, runningScope } from '../lib/dmnModel';
+import { closureOf, groupsOf, runningScope } from '../lib/dmnModel';
 import { fromCellText, isExpectation, SCENARIO } from '../lib/testSpec';
 
 /*
- * Evaluates whichever tables are switched on (RunPicker) — one table, a pair, a long chain, a tree —
- * giving the results of any switched-off table they use as values. Each table that runs shows its
- * result and the rule that gave it; one that failed says why, plainly, and tables after it say they did
- * not run because of it. The parent marks the answering rules from the `answer` event.
+ * Evaluates the way DMN does: a table runs with every table it requires, so only the values at the
+ * start of that chain are given. Each table that runs shows its result and the rule that gave it; one
+ * that failed says why, plainly, and tables after it say they did not run because of it. The parent
+ * marks the answering rules from the `answer` event.
  */
 const props = defineProps({
   decisions: { type: Array, required: true },
@@ -89,17 +86,19 @@ const busy = ref(false);
 
 const byId = computed(() => new Map(props.decisions.map((d) => [d.id, d])));
 
-// Which tables run (RunPicker): this one alone in its own tab; its whole group where the chain is the subject.
-const runIds = ref([]);
 // In a table's tab the panel is about that table; in the overview it is about no table in particular.
 const focused = computed(() => props.defaultScope !== 'whole');
-watch(() => props.decision.id, () => {
+// Which tables run: in its own tab, this table and every table it requires; where the chain is the
+// subject, its whole group.
+const runIds = computed(() => {
+  if (focused.value) return [...closureOf(props.decisions, props.decision.id)];
   const group = groupsOf(props.decisions.filter((d) => d.tabular)).find((g) => g.some((d) => d.id === props.decision.id)) || [props.decision];
-  runIds.value = props.defaultScope === 'whole' ? group.map((d) => d.id) : [props.decision.id];
+  return group.map((d) => d.id);
+});
+watch(() => props.decision.id, () => {
   steps.value = [];
   emit('answer', null);
 }, { immediate: true });
-watch(runIds, () => { steps.value = []; });
 
 const scope = computed(() => runningScope(props.decisions, runIds.value));
 const chain = computed(() => scope.value.runs.filter((d) => d.tabular));

@@ -3,7 +3,7 @@ import { api } from './api';
 import { app } from '../store';
 
 /*
- * The open space: which tables it holds, what changed since its last saved version, and therefore
+ * The open space: which tables it holds, what changed since its last commit, and therefore
  * which step of the journey it is on. The step is derived, never stored, so the trail cannot drift
  * from what is actually true of the files.
  */
@@ -31,7 +31,7 @@ export const space = reactive({
   changes: [], // [{ path, change }]
   loading: false,
   missing: false,
-  // The saved version's own tests: the evidence for "Test" once nothing unsaved is left to test.
+  // The last commit's own tests: the evidence for "Test" once nothing uncommitted is left to test.
   savedVerdict: null, // { head, passed }
 
   async open(id) {
@@ -67,12 +67,12 @@ export const space = reactive({
     }
   },
 
-  /** Records the saved version's tests as known (just saved from files whose tests all passed). */
+  /** Records the last commit's tests as known (just committed from files whose tests all passed). */
   seedSaved(head, passed) {
     rememberVerdict(head, passed);
   },
 
-  /** Runs the saved version's tests once per version (a commit never changes, so neither does the answer). */
+  /** Runs the last commit's tests once per commit (a commit never changes, so neither does the answer). */
   checkSaved() {
     const head = this.info?.head;
     if (!head || this.changes.length || this.savedVerdict?.head === head) return;
@@ -94,7 +94,7 @@ export const space = reactive({
     return this.files.map((f) => f.name.replace(/\.dmn$/i, '')).sort();
   },
 
-  /** How each table stands against the last saved version. */
+  /** How each table stands against the last commit. */
   changeOf(table) {
     const hits = this.changes.filter((c) => c.path === `dmn/${table}.dmn` || c.path === `yaml/${table}.yaml`);
     if (!hits.length) return null;
@@ -119,9 +119,9 @@ export const space = reactive({
       { key: 'test', label: 'Test', to: '/test' }
     ];
     if (this.id) {
-      all.push({ key: 'version', label: 'Save version', to: '/version' });
+      all.push({ key: 'version', label: 'Commit changes', to: '/version' });
       if (this.tryAvailable) all.push({ key: 'try', label: `Try in ${env}`, to: '/try' });
-      all.push({ key: 'land', label: 'Land', to: '/land' });
+      all.push({ key: 'land', label: 'Merge', to: '/land' });
     }
     const current = this.current;
     const changed = this.changes.length > 0;
@@ -130,20 +130,20 @@ export const space = reactive({
     // A check mark is a claim; each one needs its own evidence, never just its place in the order.
     const done = {
       edit: changed || versioned,
-      // Unsaved changes: tested here. Nothing unsaved: the saved version's own tests are the evidence.
+      // Uncommitted changes: tested here. Nothing uncommitted: the last commit's own tests are the evidence.
       test: changed ? this.testedOk : versioned && this.savedVerdict?.head === this.info?.head && this.savedVerdict.passed,
       version: versioned,
       try: false,
       land: landed
     };
-    // The saved version's tests are being checked: say so, rather than showing it as not done.
+    // The last commit's tests are being checked: say so, rather than showing it as not done.
     const checking = { test: !changed && versioned && !landed && this.savedVerdict?.head !== this.info?.head };
     // ...and when they fail, say that: it is why nothing after it can happen.
     const failing = { test: this.savedFails };
     return all.map((s) => ({ ...s, current: s.key === current && !landed, done: !!done[s.key] && (s.key !== current || landed), checking: !!checking[s.key], failing: !!failing[s.key] }));
   },
 
-  /** Nothing unsaved, and the saved version's own tests fail. */
+  /** Nothing uncommitted, and the last commit's own tests fail. */
   get savedFails() {
     return !this.changes.length && !this.info?.saved?.landed && (this.info?.ahead || 0) > 0
       && this.savedVerdict?.head === this.info?.head && this.savedVerdict.passed === false;

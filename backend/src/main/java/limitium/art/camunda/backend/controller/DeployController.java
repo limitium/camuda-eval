@@ -115,7 +115,7 @@ public class DeployController {
 
     private ResponseEntity<?> run(Action action) {
         if (!git.isEnabled()) {
-            return error(HttpStatus.NOT_FOUND, "this instance keeps no version history");
+            return error(HttpStatus.NOT_FOUND, "this instance keeps no git history");
         }
         try {
             return ResponseEntity.ok(action.run());

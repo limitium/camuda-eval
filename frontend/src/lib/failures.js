@@ -7,6 +7,9 @@ export function plainFailure(error) {
   }
   const differ = text.match(/^AssertionError: (\S+): Values differ: expected=(.*), actual=(.*)$/);
   if (differ) return `${differ[1]}: expected ${differ[2]}, the table gave ${differ[3]}.`;
+  // Said in words already by the runner: what was expected, and what the table gave.
+  const said = text.match(/^AssertionError: (.*)$/);
+  if (said) return `${said[1]}.`;
   return text
     .replace(/^\w+(Exception|Error): /, '')
     .replace(/^Error evaluating decision: \S+ -> /, '')

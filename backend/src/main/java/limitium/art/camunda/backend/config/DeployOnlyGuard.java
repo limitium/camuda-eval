@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 /**
  * A deploy-only instance (production) changes nothing: no tables, tests, work spaces, versions,
  * release lines or clean-ups. It looks at what runs and at any version, runs tests and tries rules
- * (computing, never storing), and deploys released versions. Every other write is refused here,
+ * (computing, never storing), asks the assistant, and deploys released versions. Every other write is refused here,
  * before any controller, so a new endpoint is closed on production until it is added below.
  */
 @Component
@@ -26,7 +26,8 @@ public class DeployOnlyGuard implements HandlerInterceptor {
             Pattern.compile("/api/evaluate"),
             Pattern.compile("/api/diff(/merge-preview)?"),
             Pattern.compile("/api/dmn/validate"),
-            Pattern.compile("/api/sync"));
+            Pattern.compile("/api/sync"),
+            Pattern.compile("/api/assistant"));
 
     private final boolean deployOnly;
 
@@ -51,7 +52,7 @@ public class DeployOnlyGuard implements HandlerInterceptor {
         }
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType("application/json");
-        response.getWriter().write("{\"code\":\"DEPLOY_ONLY\",\"error\":\"this instance deploys released versions only; nothing is changed here\"}");
+        response.getWriter().write("{\"code\":\"DEPLOY_ONLY\",\"error\":\"this instance deploys release tags only; nothing is changed here\"}");
         return false;
     }
 }

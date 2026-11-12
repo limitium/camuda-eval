@@ -23,8 +23,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Release lines and the versions made on them.
@@ -41,8 +39,6 @@ import java.util.regex.Pattern;
 public class Releases {
 
     static final String VERDICT = "camunda-eval-verified: ";
-    private static final Pattern VERSION = Pattern.compile("v(\\d+)\\.(\\d+)\\.(\\d+)");
-    private static final Pattern LINE = Pattern.compile("release/(\\d+)\\.(\\d+)");
     private static final ObjectMapper JSON = new ObjectMapper();
 
     public static class Refused extends RuntimeException {
@@ -62,6 +58,8 @@ public class Releases {
         public String when;
         public String by;
         public String notes;
+        /** The release branch it was made on. */
+        public String branch;
         /** Made here, with every test green at its commit, recorded in the tag. */
         public boolean verified;
         public Map<String, Object> verdict;
@@ -78,10 +76,17 @@ public class Releases {
         public List<Version> versions = new ArrayList<>();
         /** Commits on the line since its newest version (all of them when there is none). */
         public int unreleased;
-        /** What releasing it now would make. */
+        /** The tag suggested for it next: after its newest tag, or its own number when it has none. */
         public String nextVersion;
+        /** The release branch suggested when one is created from it. */
+        public String nextBranch;
+        /** The next newer release branch (open or deleted): this branch's tags are numbered below it. */
+        public String newerBranch;
         /** For the newest work: the line releasing it opens. */
         public String opensLine;
+        /** main only: the newest line, open or closed, and where it left main; the next line opens from a newer commit of main. */
+        public String opensAfterLine;
+        public String opensAfter;
         /** Newer lines and main that do not have this line's newest commit yet: its fixes stopped short. */
         public List<String> missingFrom = new ArrayList<>();
     }
@@ -105,15 +110,15 @@ public class Releases {
             List<String> branches = new ArrayList<>();
             branches.add(mainBranch);
             List<String> releaseLines = new ArrayList<>();
-            for (Ref ref : repository.getRefDatabase().getRefsByPrefix(Constants.R_HEADS + "release/")) {
+            for (Ref ref : repository.getRefDatabase().getRefsByPrefix(Constants.R_HEADS + ReleaseNames.PREFIX)) {
                 String branch = ref.getName().substring(Constants.R_HEADS.length());
-                if (LINE.matcher(branch).matches()) {
+                if (ReleaseNames.isBranch(branch)) {
                     releaseLines.add(branch);
                 }
             }
-            releaseLines.sort(Comparator.comparing((String b) -> lineKey(b)).reversed());
+            releaseLines.sort(Comparator.comparing((String b) -> ReleaseNames.branchKey(b)).reversed());
             branches.addAll(releaseLines);
-            int[] next = nextLine(all, releaseLines);
+            java.util.TreeMap<String, java.util.Map.Entry<String, ObjectId>> starts = lineStarts(repository, all);
             for (String branch : branches) {
                 ObjectId tipId = repository.resolve(Constants.R_HEADS + branch);
                 if (tipId == null) {
@@ -129,7 +134,13 @@ public class Releases {
                 line.tipWhen = Instant.ofEpochSecond(tip.getCommitTime()).toString();
                 if (line.main) {
                     // main is never tagged: the next release is stabilised on its own line first.
-                    line.opensLine = "release/" + next[0] + "." + next[1];
+                    line.opensLine = nextBranch(starts, null);
+                    line.nextBranch = line.opensLine;
+                    if (!starts.isEmpty()) {
+                        ObjectId start = startOf(repository, starts, starts.lastKey(), tip);
+                        line.opensAfterLine = starts.lastEntry().getValue().getKey();
+                        line.opensAfter = start == null ? null : start.getName();
+                    }
                     line.nextVersion = null;
                     for (Version v : all) {
                         if (isAncestor(repository, v.commit, tip)) {
@@ -137,22 +148,26 @@ public class Releases {
                         }
                     }
                 } else {
-                    Matcher m = LINE.matcher(branch);
-                    m.matches();
-                    String prefix = "v" + m.group(1) + "." + m.group(2) + ".";
-                    int patch = -1;
                     for (Version v : all) {
-                        if (v.name.startsWith(prefix)) {
+                        if (branch.equals(v.branch)) {
                             line.versions.add(v);
-                            patch = Math.max(patch, Integer.parseInt(v.name.substring(prefix.length())));
                         }
                     }
-                    line.nextVersion = prefix + (patch + 1);
+                    int[] own = ReleaseNames.ofBranch(branch);
+                    if (line.versions.isEmpty()) {
+                        line.nextVersion = "v" + ReleaseNames.show(own);
+                    } else {
+                        int[] last = ReleaseNames.ofTag(line.versions.get(0).name);
+                        line.nextVersion = "v" + last[0] + "." + last[1] + "." + (last[2] + 1);
+                    }
+                    java.util.Map.Entry<String, java.util.Map.Entry<String, ObjectId>> newer = starts.higherEntry(ReleaseNames.branchKey(branch));
+                    line.newerBranch = newer == null ? null : newer.getValue().getKey();
+                    line.nextBranch = nextBranch(starts, branch);
                 }
                 if (!line.main) {
                     List<String> after = new ArrayList<>();
                     for (String other : releaseLines) {
-                        if (lineKey(other).compareTo(lineKey(branch)) > 0) {
+                        if (ReleaseNames.branchKey(other).compareTo(ReleaseNames.branchKey(branch)) > 0) {
                             after.add(other);
                         }
                     }
@@ -186,6 +201,15 @@ public class Releases {
      * commit on the line, newer than its last version — versions only ever move forward.
      */
     public Map<String, Object> release(String branch, String at, String notes, String by, boolean check) throws IOException {
+        return release(branch, at, null, notes, by, check);
+    }
+
+    /**
+     * Tags a commit of a release branch as {@code name} (vX.Y.Z; the suggested next tag when blank).
+     * A tag follows version order: after the branch's newest tag, from the branch's own number, and
+     * below the next newer release branch — so v1.0.2 goes on release/1.0, never on release/1.1.
+     */
+    public Map<String, Object> release(String branch, String at, String name, String notes, String by, boolean check) throws IOException {
         if (sync.enabled()) {
             sync.run(); // a version made on another instance meanwhile must be seen before numbering
         }
@@ -199,10 +223,10 @@ public class Releases {
                 }
             }
             if (line == null) {
-                throw new Refused("NO_SUCH_LINE", "there is no line " + branch, null);
+                throw new Refused("NO_SUCH_LINE", "there is no branch " + branch, null);
             }
             if (line.main) {
-                throw new Refused("NOT_A_RELEASE_LINE", "versions are tagged on release lines; open a release line from "
+                throw new Refused("NOT_A_RELEASE_LINE", "tags are made on release branches; create a release branch from "
                         + branch + " to stabilise it, then tag it there", null);
             }
             String commit = line.tip;
@@ -219,23 +243,25 @@ public class Releases {
                         String last = line.versions.get(0).commit;
                         if (last.equals(id.getName()) || !GitRuleStore.isAncestor(git.getRepository(), ObjectId.fromString(last), walk.parseCommit(id))) {
                             throw new Refused("NOT_NEWER", "that commit is not newer than " + line.versions.get(0).name
-                                    + "; a version only comes after the one before it", null);
+                                    + "; a tag only comes after the one before it", null);
                         }
                     }
                     commit = id.getName();
                 }
             } else if (line.unreleased == 0 && !line.versions.isEmpty()) {
-                throw new Refused("NOTHING_NEW", "the newest commit on " + branch + " is already " + line.versions.get(0).name, null);
+                throw new Refused("NOTHING_NEW", "the newest commit on " + branch + " is already tagged " + line.versions.get(0).name, null);
             }
+            String tagName = name == null || name.isBlank() ? line.nextVersion : ReleaseNames.tagFrom(name);
+            checkTagName(line, name, tagName);
             TestGate.Report report = gate.run(commit);
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("line", branch);
-            result.put("version", line.nextVersion);
+            result.put("version", tagName);
             result.put("commit", commit);
             result.put("tests", report);
             if (!report.passed) {
                 throw new Refused("TESTS_FAILED", report.failed + (report.failed == 1 ? " test fails" : " tests fail")
-                        + " at " + (commit.equals(line.tip) ? "the newest commit of " + branch : commit.substring(0, 7)) + "; no version was made", report);
+                        + " at " + (commit.equals(line.tip) ? "the newest commit of " + branch : commit.substring(0, 7)) + "; no tag was made", report);
             }
             if (check) {
                 return result;
@@ -247,22 +273,22 @@ public class Releases {
                 verdict.put("at", Instant.now().toString());
                 verdict.put("by", by);
                 TagBuilder builder = new TagBuilder();
-                builder.setTag(line.nextVersion);
+                builder.setTag(tagName);
                 builder.setObjectId(tip, Constants.OBJ_COMMIT);
                 builder.setTagger(new PersonIdent(by == null ? store.properties().getAuthorName() : by, store.properties().getAuthorEmail()));
-                builder.setMessage((notes == null || notes.isBlank() ? line.nextVersion : notes.trim())
-                        + "\n\n" + VERDICT + JSON.writeValueAsString(verdict) + "\n");
+                builder.setMessage(ReleaseNames.annotation(notes == null || notes.isBlank() ? tagName : notes.trim(), branch)
+                        + VERDICT + JSON.writeValueAsString(verdict) + "\n");
                 tag = inserter.insert(builder);
                 inserter.flush();
             }
             List<RefTransaction.Move> moves = new ArrayList<>();
-            moves.add(new RefTransaction.Move(Constants.R_TAGS + line.nextVersion, null, tag));
+            moves.add(new RefTransaction.Move(Constants.R_TAGS + tagName, null, tag));
             try {
                 RefTransaction.apply(store, moves);
             } catch (RefTransaction.Refused e) {
                 throw new Refused("MOVED".equals(e.code) || "REMOTE_REFUSED".equals(e.code) ? "VERSION_TAKEN" : e.code,
                         "MOVED".equals(e.code) || "REMOTE_REFUSED".equals(e.code)
-                                ? line.nextVersion + " was just made elsewhere; nothing was changed — look again" : e.getMessage(), null);
+                                ? tagName + " was just made elsewhere; nothing was changed — look again" : e.getMessage(), null);
             }
             return result;
         } finally {
@@ -270,11 +296,43 @@ public class Releases {
         }
     }
 
-    /**
-     * Opens a release line at a commit of main: where that release is stabilised and later fixed.
-     * {@code number} is "M.m"; the next free one when blank.
-     */
+    /** A tag name follows version order on its branch; said plainly when it does not. */
+    private void checkTagName(Line line, String typed, String tagName) throws IOException {
+        if (tagName == null) {
+            throw new Refused("BAD_VERSION", "“" + typed.trim() + "” is not a version: a tag is numbered like v1.2.3", null);
+        }
+        if (store.resolve(Constants.R_TAGS + tagName) != null) {
+            throw new Refused("VERSION_TAKEN", tagName + " exists already", null);
+        }
+        int[] n = ReleaseNames.ofTag(tagName);
+        if (!line.versions.isEmpty() && ReleaseNames.compare(n, ReleaseNames.ofTag(line.versions.get(0).name)) <= 0) {
+            throw new Refused("NOT_AFTER_LAST_TAG", tagName + " is not after " + line.versions.get(0).name + ", the newest tag on " + line.branch, null);
+        }
+        int[] own = ReleaseNames.ofBranch(line.branch);
+        if (ReleaseNames.compare(n, own) < 0) {
+            throw new Refused("BELOW_BRANCH", "tags on " + line.branch + " start at v" + ReleaseNames.show(own), null);
+        }
+        // Below the next newer release branch, and within the branch's own minor: release/1.0 holds 1.0.x.
+        int[] nextMinor = {own[0], own[1] + 1, 0};
+        boolean newerFirst = line.newerBranch != null && ReleaseNames.compare(ReleaseNames.ofBranch(line.newerBranch), nextMinor) < 0;
+        int[] limit = newerFirst ? ReleaseNames.ofBranch(line.newerBranch) : nextMinor;
+        if (ReleaseNames.compare(n, limit) >= 0) {
+            throw new Refused("ABOVE_BRANCH", "tags on " + line.branch + " are numbered below v" + ReleaseNames.show(limit)
+                    + (newerFirst ? ", where " + line.newerBranch + " starts" : "; a newer minor needs its own release branch"), null);
+        }
+    }
+
     public Map<String, Object> openLine(String at, String number, String by) throws IOException {
+        return openLine(at, number, null, by);
+    }
+
+    /**
+     * Creates a release branch at a commit of main or of a release branch ({@code from}, the branch the
+     * commit was picked on): where that release is stabilised and later fixed. {@code number} is "X.Y" or
+     * "X.Y.Z"; the suggested one when blank. It follows version order: above the release branch it is
+     * created from — from main, above every release branch — and it starts after the one below it.
+     */
+    public Map<String, Object> openLine(String at, String number, String from, String by) throws IOException {
         if (sync.enabled()) {
             sync.run();
         }
@@ -288,79 +346,101 @@ public class Releases {
                 throw new Refused("NO_SUCH_COMMIT", "there is no commit " + at, null);
             }
             ObjectId mainTip = repository.resolve(Constants.R_HEADS + mainBranch);
-            if (mainTip == null || !GitRuleStore.isAncestor(repository, id, walk.parseCommit(mainTip))) {
-                throw new Refused("NOT_ON_MAIN", "a release line opens from a commit of " + mainBranch, null);
+            java.util.TreeMap<String, java.util.Map.Entry<String, ObjectId>> starts = lineStarts(repository, versions(repository, walk));
+            boolean fromRelease = ReleaseNames.isBranch(from);
+            ObjectId sourceTip = repository.resolve(Constants.R_HEADS + (fromRelease ? from : mainBranch));
+            if (sourceTip == null || !GitRuleStore.isAncestor(repository, id, walk.parseCommit(sourceTip))) {
+                throw new Refused("NOT_ON_MAIN", "that commit is not on " + (fromRelease ? from : mainBranch), null);
             }
-            String branch;
-            if (number == null || number.isBlank()) {
-                List<String> releaseLines = new ArrayList<>();
-                for (Ref ref : repository.getRefDatabase().getRefsByPrefix(Constants.R_HEADS + "release/")) {
-                    releaseLines.add(ref.getName().substring(Constants.R_HEADS.length()));
-                }
-                releaseLines.removeIf(b -> !LINE.matcher(b).matches());
-                int[] next = nextLine(versions(repository, walk), releaseLines);
-                branch = "release/" + next[0] + "." + next[1];
-            } else {
-                branch = "release/" + number.trim().replaceFirst("^release/", "").replaceFirst("^v", "");
+            String typed = number == null || number.isBlank() ? null : number.trim().replaceFirst("^" + ReleaseNames.PREFIX, "").replaceFirst("^v", "");
+            String branch = typed == null ? nextBranch(starts, fromRelease ? from : null) : ReleaseNames.PREFIX + typed;
+            int[] n = ReleaseNames.ofBranch(branch);
+            if (n == null) {
+                throw new Refused("BAD_NUMBER", "“" + number.trim() + "” is not a version: a release branch is numbered like 1.2 or 1.2.3", null);
             }
-            Matcher m = LINE.matcher(branch);
-            if (!m.matches()) {
-                throw new Refused("BAD_NUMBER", "a release line is numbered like 1.2", null);
+            String key = ReleaseNames.branchKey(branch);
+            if (starts.containsKey(key)) {
+                String same = starts.get(key).getKey();
+                throw repository.resolve(Constants.R_HEADS + same) != null
+                        ? new Refused("LINE_EXISTS", same + " exists already", null)
+                        : new Refused("RELEASED_BEFORE", same + " was tagged before and deleted; start a fix from one of its tags to create it again", null);
             }
-            if (repository.resolve(Constants.R_HEADS + branch) != null) {
-                throw new Refused("LINE_EXISTS", branch.replace("release/", "release ") + " is open already", null);
+            // Version order: above what it is created from — from main, above every release branch — so a
+            // fix merged forward always moves into newer work.
+            if (fromRelease && ReleaseNames.compare(n, ReleaseNames.ofBranch(from)) <= 0) {
+                throw new Refused("NOT_AFTER_SOURCE", "a release branch created from " + from + " is numbered after "
+                        + ReleaseNames.ofBranch(from)[0] + "." + ReleaseNames.ofBranch(from)[1]
+                        + (ReleaseNames.ofBranch(from)[2] == 0 ? "" : "." + ReleaseNames.ofBranch(from)[2]), null);
             }
-            String prefix = "v" + m.group(1) + "." + m.group(2) + ".";
-            for (Version v : versions(repository, walk)) {
-                if (v.name.startsWith(prefix)) {
-                    throw new Refused("RELEASED_BEFORE", branch.replace("release/", "release ") + " was released before (" + v.name
-                            + "); start a fix from that version to open it again", null);
-                }
+            if (!fromRelease && !starts.isEmpty() && starts.lastKey().compareTo(key) > 0) {
+                throw new Refused("OUT_OF_ORDER", starts.lastEntry().getValue().getKey()
+                        + " exists already; a release branch created from " + mainBranch + " is numbered after it", null);
             }
-            // Lines are in order: a newer number is never older than what it follows, and it forks
-            // from main after the line before it, so carrying a fix forward always moves into newer work.
-            java.util.Set<ObjectId> mainChain = firstParents(repository, mainTip);
-            java.util.TreeMap<String, ObjectId> starts = new java.util.TreeMap<>(); // line key -> a commit on it
-            java.util.Map<String, String> names = new java.util.HashMap<>();
-            for (Ref ref : repository.getRefDatabase().getRefsByPrefix(Constants.R_HEADS + "release/")) {
-                String other = ref.getName().substring(Constants.R_HEADS.length());
-                if (LINE.matcher(other).matches()) {
-                    starts.put(lineKey(other), ref.getObjectId());
-                    names.put(lineKey(other), other);
-                }
-            }
-            for (Version v : versions(repository, walk)) { // a closed line is still where its versions are
-                Matcher vm = VERSION.matcher(v.name);
-                vm.matches();
-                String vLine = "release/" + vm.group(1) + "." + vm.group(2);
-                starts.putIfAbsent(lineKey(vLine), ObjectId.fromString(v.commit));
-                names.putIfAbsent(lineKey(vLine), vLine);
-            }
-            if (!starts.isEmpty() && starts.lastKey().compareTo(lineKey(branch)) > 0) {
-                throw new Refused("OUT_OF_ORDER", "release " + names.get(starts.lastKey()).substring(8)
-                        + " exists already; a new line is numbered after it", null);
-            }
-            java.util.Map.Entry<String, ObjectId> before = starts.lowerEntry(lineKey(branch));
+            java.util.Map.Entry<String, java.util.Map.Entry<String, ObjectId>> before = starts.lowerEntry(key);
             if (before != null) {
-                ObjectId fork = forkPoint(repository, before.getValue(), mainChain);
+                ObjectId fork = startOf(repository, starts, before.getKey(), mainTip);
                 if (fork != null && (fork.equals(id) || !GitRuleStore.isAncestor(repository, fork, walk.parseCommit(id)))) {
-                    throw new Refused("NOT_AFTER_PREVIOUS", "release " + branch.substring(8) + " must branch from main after release "
-                            + names.get(before.getKey()).substring(8) + " did (at " + fork.getName().substring(0, 7) + "); pick a newer commit of main", null);
+                    throw new Refused("NOT_AFTER_PREVIOUS", branch + " must start after "
+                            + before.getValue().getKey() + " did (at " + fork.getName().substring(0, 7) + "); pick a newer commit of "
+                            + before.getValue().getKey() + " or of main", null);
                 }
             }
             try {
                 RefTransaction.apply(store, java.util.Collections.singletonList(new RefTransaction.Move(Constants.R_HEADS + branch, null, id)));
             } catch (RefTransaction.Refused e) {
-                throw new Refused("LINE_EXISTS", branch + " was just opened elsewhere; look again", null);
+                throw new Refused("LINE_EXISTS", branch + " was just created elsewhere; look again", null);
             }
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("line", branch);
             result.put("commit", id.getName());
-            result.put("nextVersion", prefix + "0");
+            result.put("nextVersion", "v" + ReleaseNames.show(n));
             return result;
         } finally {
             lifecycle.unlock();
         }
+    }
+
+    /** Every release line by its number, open or closed (a closed one is still where its versions are): its branch and a commit on it. */
+    private static java.util.TreeMap<String, java.util.Map.Entry<String, ObjectId>> lineStarts(Repository repository, List<Version> versions) throws IOException {
+        java.util.TreeMap<String, java.util.Map.Entry<String, ObjectId>> starts = new java.util.TreeMap<>();
+        for (Ref ref : repository.getRefDatabase().getRefsByPrefix(Constants.R_HEADS + ReleaseNames.PREFIX)) {
+            String branch = ref.getName().substring(Constants.R_HEADS.length());
+            if (ReleaseNames.isBranch(branch)) {
+                starts.put(ReleaseNames.branchKey(branch), new java.util.AbstractMap.SimpleImmutableEntry<>(branch, ref.getObjectId()));
+            }
+        }
+        for (Version v : versions) {
+            if (v.branch != null) {
+                starts.putIfAbsent(ReleaseNames.branchKey(v.branch), new java.util.AbstractMap.SimpleImmutableEntry<>(v.branch, ObjectId.fromString(v.commit)));
+            }
+        }
+        return starts;
+    }
+
+    /**
+     * The release branch suggested next: from main, the next minor after the newest release branch
+     * (1.0 when there is none); from a release branch, its next minor when free and nothing sits
+     * between, else its next patch — release/1.0 suggests 1.1, or 1.0.1 once 1.1 exists.
+     */
+    private static String nextBranch(java.util.TreeMap<String, java.util.Map.Entry<String, ObjectId>> starts, String from) {
+        if (from == null) {
+            if (starts.isEmpty()) {
+                return ReleaseNames.PREFIX + "1.0";
+            }
+            int[] newest = ReleaseNames.ofBranch(starts.lastEntry().getValue().getKey());
+            return ReleaseNames.PREFIX + newest[0] + "." + (newest[1] + 1);
+        }
+        int[] n = ReleaseNames.ofBranch(from);
+        int[] minor = {n[0], n[1] + 1, 0};
+        java.util.Map.Entry<String, java.util.Map.Entry<String, ObjectId>> newer = starts.higherEntry(ReleaseNames.branchKey(from));
+        if (newer == null || ReleaseNames.compare(ReleaseNames.ofBranch(newer.getValue().getKey()), minor) > 0) {
+            return ReleaseNames.PREFIX + minor[0] + "." + minor[1];
+        }
+        int[] patch = {n[0], n[1], n[2] + 1};
+        while (starts.containsKey(ReleaseNames.key(patch))) {
+            patch[2]++;
+        }
+        return ReleaseNames.PREFIX + ReleaseNames.show(patch);
     }
 
     /** main's own history: its commits following first parents only, not what was merged into it. */
@@ -377,14 +457,25 @@ public class Releases {
     }
 
     /**
-     * Where a line left main: following the line's own first parents back to main's history. (A
-     * merge-base would not do: once a line's fixes are carried into main, main contains its tip.)
+     * Where a line started: following its own first parents back to the history of main or of an older
+     * line, whichever it was opened from. (A merge-base would not do: once a line's fixes are carried
+     * forward, the newer lines and main contain its tip.)
      */
-    private static ObjectId forkPoint(Repository repository, ObjectId onLine, java.util.Set<ObjectId> mainChain) throws IOException {
+    private static ObjectId startOf(Repository repository, java.util.TreeMap<String, java.util.Map.Entry<String, ObjectId>> starts,
+                                    String key, ObjectId mainTip) throws IOException {
+        java.util.Set<ObjectId> older = mainTip == null ? new java.util.HashSet<>() : firstParents(repository, mainTip);
+        for (java.util.Map.Entry<String, ObjectId> line : starts.headMap(key, false).values()) {
+            older.addAll(firstParents(repository, line.getValue()));
+        }
+        return forkPoint(repository, starts.get(key).getValue(), older);
+    }
+
+    /** The first commit of a line's own first parents that is also in the given history. */
+    private static ObjectId forkPoint(Repository repository, ObjectId onLine, java.util.Set<ObjectId> history) throws IOException {
         try (RevWalk walk = new RevWalk(repository)) {
             RevCommit c = walk.parseCommit(onLine);
             while (c != null) {
-                if (mainChain.contains(c)) {
+                if (history.contains(c)) {
                     return c.copy();
                 }
                 c = c.getParentCount() == 0 ? null : walk.parseCommit(c.getParent(0));
@@ -399,12 +490,13 @@ public class Releases {
         List<Version> versions = new ArrayList<>();
         for (Ref ref : repository.getRefDatabase().getRefsByPrefix(Constants.R_TAGS)) {
             String name = ref.getName().substring(Constants.R_TAGS.length());
-            if (!VERSION.matcher(name).matches()) {
+            if (!ReleaseNames.isTag(name)) {
                 continue;
             }
             RevObject object = walk.parseAny(ref.getObjectId());
             Version v = new Version();
             v.name = name;
+            v.branch = ReleaseNames.branchOfTag(name, null);
             if (object instanceof RevTag) {
                 RevTag tag = (RevTag) object;
                 walk.parseBody(tag);
@@ -413,8 +505,11 @@ public class Releases {
                 v.when = tag.getTaggerIdent() == null ? null : tag.getTaggerIdent().getWhenAsInstant().toString();
                 v.by = tag.getTaggerIdent() == null ? null : tag.getTaggerIdent().getName();
                 String message = tag.getFullMessage();
+                v.branch = ReleaseNames.branchOfTag(name, message);
                 int at = message.indexOf(VERDICT);
-                v.notes = (at < 0 ? message : message.substring(0, at)).trim();
+                int trailer = message.indexOf(ReleaseNames.BRANCH_TRAILER);
+                int notesEnd = Math.min(at < 0 ? message.length() : at, trailer < 0 ? message.length() : trailer);
+                v.notes = message.substring(0, notesEnd).trim();
                 if (at >= 0) {
                     try {
                         @SuppressWarnings("unchecked")
@@ -432,48 +527,8 @@ public class Releases {
             }
             versions.add(v);
         }
-        versions.sort(Comparator.comparing((Version v) -> versionKey(v.name)).reversed());
+        versions.sort(Comparator.comparing((Version v) -> ReleaseNames.tagKey(v.name)).reversed());
         return versions;
-    }
-
-    /** The next line the newest work opens: same major, next minor; v1.0 when nothing exists yet. */
-    private static int[] nextLine(List<Version> versions, List<String> lines) {
-        int major = -1;
-        int minor = -1;
-        for (Version v : versions) {
-            Matcher m = VERSION.matcher(v.name);
-            m.matches();
-            int ma = Integer.parseInt(m.group(1));
-            int mi = Integer.parseInt(m.group(2));
-            if (ma > major || (ma == major && mi > minor)) {
-                major = ma;
-                minor = mi;
-            }
-        }
-        for (String line : lines) {
-            Matcher m = LINE.matcher(line);
-            m.matches();
-            int ma = Integer.parseInt(m.group(1));
-            int mi = Integer.parseInt(m.group(2));
-            if (ma > major || (ma == major && mi > minor)) {
-                major = ma;
-                minor = mi;
-            }
-        }
-        return major < 0 ? new int[]{1, 0} : new int[]{major, minor + 1};
-    }
-
-    private static String versionKey(String name) {
-        Matcher m = VERSION.matcher(name);
-        if (!m.matches()) {
-            return name;
-        }
-        return String.format("%06d.%06d.%06d", Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), Integer.parseInt(m.group(3)));
-    }
-
-    private static String lineKey(String branch) {
-        Matcher m = LINE.matcher(branch);
-        return m.matches() ? String.format("%06d.%06d", Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2))) : branch;
     }
 
     private static boolean isAncestor(Repository repository, String commit, RevCommit tip) throws IOException {

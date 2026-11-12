@@ -50,15 +50,19 @@ public class LifecycleController {
         public String notes;
         /** Run the tests and say what would be made; change nothing. */
         public boolean check;
-        /** The commit to make the version at; the line's newest when absent. */
+        /** The commit to tag; the branch's newest when absent. */
         public String at;
+        /** The tag, vX.Y.Z; the suggested next one when absent. */
+        public String version;
     }
 
     public static class OpenLineRequest {
-        /** The commit of main it opens at; main's newest when absent. */
+        /** The commit it starts at; main's newest when absent. */
         public String at;
-        /** "M.m"; the next free number when absent. */
+        /** "X.Y" or "X.Y.Z"; the suggested number when absent. */
         public String number;
+        /** The branch the commit was picked on: main, or the release branch it is created from. */
+        public String from;
     }
 
     public static class LandRequest {
@@ -88,7 +92,7 @@ public class LifecycleController {
         }
         WorkspaceId id = WorkspaceId.parse(kind + "/" + owner + "/" + name);
         if (id == null || request == null || request.from == null) {
-            return error(HttpStatus.BAD_REQUEST, "say which space and what to bring in");
+            return error(HttpStatus.BAD_REQUEST, "say which space and what to merge from");
         }
         try {
             return ResponseEntity.ok(landing.pull(id, request.from, answers(request.resolutions),
@@ -153,7 +157,7 @@ public class LifecycleController {
     @GetMapping("/lines")
     public ResponseEntity<?> lines() {
         if (!git.isEnabled()) {
-            return error(HttpStatus.NOT_FOUND, "this instance keeps no version history");
+            return error(HttpStatus.NOT_FOUND, "this instance keeps no git history");
         }
         try {
             return ResponseEntity.ok(releases.lines());
@@ -169,7 +173,7 @@ public class LifecycleController {
             return refused;
         }
         try {
-            return ResponseEntity.ok(releases.release(request.line, request.at, request.notes, users.require(http), request.check));
+            return ResponseEntity.ok(releases.release(request.line, request.at, request.version, request.notes, users.require(http), request.check));
         } catch (Releases.Refused e) {
             return refusedBody(e);
         } catch (Exception e) {
@@ -221,7 +225,7 @@ public class LifecycleController {
             return refused;
         }
         try {
-            return ResponseEntity.ok(releases.openLine(request.at, request.number, users.require(http)));
+            return ResponseEntity.ok(releases.openLine(request.at, request.number, request.from, users.require(http)));
         } catch (Releases.Refused e) {
             return refusedBody(e);
         } catch (Exception e) {
@@ -278,10 +282,10 @@ public class LifecycleController {
 
     private ResponseEntity<?> authorOnly() {
         if (!git.isEnabled()) {
-            return error(HttpStatus.NOT_FOUND, "this instance keeps no version history");
+            return error(HttpStatus.NOT_FOUND, "this instance keeps no git history");
         }
         if ("deployer".equals(role)) {
-            return error(HttpStatus.FORBIDDEN, "this instance deploys only; lines and versions are made on an authoring instance");
+            return error(HttpStatus.FORBIDDEN, "this instance deploys only; branches and tags are made on an authoring instance");
         }
         return null;
     }

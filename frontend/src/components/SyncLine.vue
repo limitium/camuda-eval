@@ -9,7 +9,7 @@
     <span v-if="!last">Not yet in touch with the other instances.</span>
     <span v-else-if="!last.ok">The other instances could not be reached {{ whenText(last.at) }}: {{ last.error }}. Work here is kept and sent when they can.</span>
     <span v-else-if="trouble">{{ troubleText }}</span>
-    <span v-else>In step with the other instances · {{ whenText(last.at) }}{{ last.takenIn.length ? ` · took in ${last.takenIn.length} from them` : '' }}</span>
+    <span v-else>In step with the other instances · {{ whenText(last.at) }}{{ last.takenIn.length ? ` · fetched ${last.takenIn.length} ${last.takenIn.length === 1 ? 'branch' : 'branches'} from them` : '' }}</span>
     <button type="button" class="btn btn-quiet btn-small" :aria-busy="busy" :disabled="busy" @click="now">Check now</button>
   </div>
 </template>
@@ -22,7 +22,7 @@ import { app, whenText } from '../store';
 
 /*
  * How this instance stands with the others. They meet only in the remote repository, so this says
- * when it last exchanged versions with it, and names anything that could not be exchanged.
+ * when it last fetched and pushed commits, and names anything that could not be pushed.
  */
 const emit = defineEmits(['changed']);
 const status = ref(null);
@@ -32,7 +32,7 @@ const notSent = computed(() => Object.entries(status.value?.notSent || {}));
 const trouble = computed(() => !!last.value && (!last.value.ok || notSent.value.length > 0 || Object.keys(last.value.diverged || {}).length > 0));
 const troubleText = computed(() => {
   const diverged = Object.keys(last.value?.diverged || {});
-  if (diverged.length) return `${diverged.join(', ')}: saved here and on another instance too. Both versions are kept; they need joining before either lands.`;
+  if (diverged.length) return `${diverged.join(', ')}: committed here and on another instance too — the branch has diverged. Both are kept; they need a merge before either is merged further.`;
   return notSent.value.map(([branch, why]) => `${branch} has not reached the other instances: ${why}`).join(' · ');
 });
 

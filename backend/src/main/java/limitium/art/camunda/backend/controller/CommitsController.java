@@ -39,7 +39,7 @@ public class CommitsController {
     @GetMapping
     public ResponseEntity<?> commit(@RequestParam String rev) {
         if (!git.isEnabled()) {
-            return error(HttpStatus.NOT_FOUND, "this instance keeps no version history");
+            return error(HttpStatus.NOT_FOUND, "this instance keeps no git history");
         }
         try {
             GitRuleStore.CommitInfo info = store.commitInfo(rev);
@@ -53,7 +53,7 @@ public class CommitsController {
     @GetMapping("/domain")
     public ResponseEntity<?> domain(@RequestParam String rev, @RequestParam String name) {
         if (!git.isEnabled()) {
-            return error(HttpStatus.NOT_FOUND, "this instance keeps no version history");
+            return error(HttpStatus.NOT_FOUND, "this instance keeps no git history");
         }
         try {
             String sha = store.resolve(rev);
@@ -80,7 +80,7 @@ public class CommitsController {
     @PostMapping("/tests")
     public ResponseEntity<?> tests(@RequestParam String rev) {
         if (!git.isEnabled()) {
-            return error(HttpStatus.NOT_FOUND, "this instance keeps no version history");
+            return error(HttpStatus.NOT_FOUND, "this instance keeps no git history");
         }
         try {
             return ResponseEntity.ok(deploys.testsForDisplay(rev));

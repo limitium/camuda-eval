@@ -33,6 +33,7 @@ class DeployOnlyGuardTest {
         assertTrue(allows(prod, "POST", "/api/runs"));
         assertTrue(allows(prod, "POST", "/api/evaluate"));
         assertTrue(allows(prod, "POST", "/api/sync"));
+        assertTrue(allows(prod, "POST", "/api/assistant"));
 
         assertFalse(allows(prod, "POST", "/api/applications/emea-street/draft"));
         assertFalse(allows(prod, "POST", "/api/workspaces"));

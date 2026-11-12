@@ -1,11 +1,11 @@
 <template>
   <div ref="wrap" class="grid-wrap max-h-[max(360px,calc(100vh-300px))] min-w-0 max-w-full overflow-auto rounded pb-1">
-    <table class="min-w-full border-separate border-spacing-0 rounded border border-rule bg-ground text-md" :class="{ readonly }">
+    <table class="border-separate border-spacing-0 rounded border border-rule bg-ground text-md" :class="{ readonly }" :style="{ minWidth: `max(100%, ${widths.total}px)` }">
       <colgroup>
         <col class="w-11" />
-        <col v-for="c in decision.inputs" :key="c.id" class="w-[150px]" />
-        <col v-for="c in decision.outputs" :key="c.id" class="w-[150px]" />
-        <col class="w-[200px]" />
+        <col v-for="(c, i) in decision.inputs" :key="c.id" :style="{ width: `${widths.inputs[i]}px` }" />
+        <col v-for="(c, i) in decision.outputs" :key="c.id" :style="{ width: `${widths.outputs[i]}px` }" />
+        <col :style="{ width: `${widths.note}px` }" />
         <col v-if="!readonly" class="w-32" />
       </colgroup>
       <thead>
@@ -31,7 +31,7 @@
             scope="col"
             :data-col="`in${i}`"
             class="head in border-b border-rule bg-platform p-0 text-left align-middle"
-            :class="[columnStates[c.id], headClass(c.id, i > 0 ? 'border-l border-l-rule' : '', highlightColumn(c.id, `in${i}`), editing?.side === 'in' && editing.index === i), { flagged: highlightColumn(c.id, `in${i}`), open: editing?.side === 'in' && editing.index === i }]"
+            :class="[{ 'sel-col': selectedLevel('COLUMN') && selected.columnId === c.id }, columnStates[c.id], headClass(c.id, i > 0 ? 'border-l border-l-rule' : '', highlightColumn(c.id, `in${i}`), editing?.side === 'in' && editing.index === i), { flagged: highlightColumn(c.id, `in${i}`), open: editing?.side === 'in' && editing.index === i }]"
           >
             <button type="button" class="head-btn grid w-full gap-px px-3 py-2 text-left disabled:cursor-default" :class="headBtnClass(c.id, editing?.side === 'in' && editing.index === i)" :disabled="readonly" @click="toggle('in', i)">
               <span class="max-w-[220px] truncate text-xs font-bold" :class="isNewOrEdited(c.id) ? 'text-edit-ink' : 'text-ink'" :title="c.label || c.expression">{{ c.label || c.expression || 'unnamed' }}</span>
@@ -58,7 +58,7 @@
             scope="col"
             :data-col="`out${i}`"
             class="head out border-b border-l border-rule bg-platform p-0 text-left align-middle"
-            :class="[columnStates[c.id], headClass(c.id, i === 0 ? 'border-l-rule-strong' : 'border-l-rule', false, editing?.side === 'out' && editing.index === i), { open: editing?.side === 'out' && editing.index === i, first: i === 0 }]"
+            :class="[{ 'sel-col': selectedLevel('COLUMN') && selected.columnId === c.id }, columnStates[c.id], headClass(c.id, i === 0 ? 'border-l-rule-strong' : 'border-l-rule', false, editing?.side === 'out' && editing.index === i), { open: editing?.side === 'out' && editing.index === i, first: i === 0 }]"
           >
             <button type="button" class="head-btn grid w-full gap-px px-3 py-2 text-left disabled:cursor-default" :class="headBtnClass(c.id, editing?.side === 'out' && editing.index === i)" :disabled="readonly" @click="toggle('out', i)">
               <span class="max-w-[220px] truncate text-xs font-bold" :class="isNewOrEdited(c.id) ? 'text-edit-ink' : 'text-ink'" :title="c.label || c.name">{{ c.label || c.name || 'unnamed' }}</span>
@@ -90,15 +90,15 @@
           :class="[rowState(rule), { focused: focusRule === rule.id }]"
           :data-rule="rule.id"
         >
-          <th class="num border-r border-b border-rule px-2.5 text-right text-xs font-medium" :class="numClass(rule)" scope="row">{{ r + 1 }}</th>
+          <th class="num border-r border-b border-rule px-2.5 text-right text-xs font-medium" :class="[numClass(rule), { 'sel-row': selectedLevel('RULE') && selected.ruleId === rule.id }]" scope="row">{{ r + 1 }}</th>
           <td v-if="!decision.inputs.length" class="cell in empty-cell border-b border-rule p-0" :class="cellClass(rule, '')"></td>
           <td
             v-for="(value, c) in rule.inputs"
             :key="`i${c}`"
             class="cell in border-b border-rule p-0 text-left align-middle"
-            :class="[cellState(rule, decision.inputs[c]?.id, `in${c}`), cellClass(rule, cellState(rule, decision.inputs[c]?.id, `in${c}`)), c > 0 ? 'border-l' : '']"
+            :class="[cellState(rule, decision.inputs[c]?.id, `in${c}`), cellClass(rule, cellState(rule, decision.inputs[c]?.id, `in${c}`)), c > 0 ? 'border-l' : '', selClass(rule, decision.inputs[c]?.id)]"
           >
-            <span v-if="readonly" class="text" :class="textClass(rule, cellState(rule, decision.inputs[c]?.id, `in${c}`), true)">{{ shown(value, 'in') }}</span>
+            <span v-if="readonly" class="text" :class="[textClass(rule, cellState(rule, decision.inputs[c]?.id, `in${c}`), true), { 'cursor-pointer': selectable }]" v-bind="pickable(rule, decision.inputs[c], r)">{{ shown(value, 'in') }}</span>
             <input
               v-else
               :value="value"
@@ -106,9 +106,11 @@
               :class="textClass(rule, cellState(rule, decision.inputs[c]?.id, `in${c}`))"
               spellcheck="false"
               :aria-label="`Rule ${r + 1}, ${decision.inputs[c]?.label || decision.inputs[c]?.expression}`"
+              :title="clipped(value, MONO, widths.inputs[c]) ? value : undefined"
               :placeholder="value === '' ? 'any' : ''"
               :data-cell="`${r}:${c}`"
               @input="$emit('cell', r, 'in', c, $event.target.value)"
+              @focus="$emit('select', rule.id, decision.inputs[c]?.id)"
               @keydown="onKey($event, r, c)"
             />
           </td>
@@ -116,9 +118,9 @@
             v-for="(value, c) in rule.outputs"
             :key="`o${c}`"
             class="cell out border-b border-l border-rule p-0 text-left align-middle"
-            :class="[cellState(rule, decision.outputs[c]?.id, `out${c}`), cellClass(rule, cellState(rule, decision.outputs[c]?.id, `out${c}`)), { first: c === 0, 'border-l-rule-strong': c === 0 }]"
+            :class="[cellState(rule, decision.outputs[c]?.id, `out${c}`), cellClass(rule, cellState(rule, decision.outputs[c]?.id, `out${c}`)), { first: c === 0, 'border-l-rule-strong': c === 0 }, selClass(rule, decision.outputs[c]?.id)]"
           >
-            <span v-if="readonly" class="text" :class="textClass(rule, cellState(rule, decision.outputs[c]?.id, `out${c}`), true)">{{ value }}</span>
+            <span v-if="readonly" class="text" :class="[textClass(rule, cellState(rule, decision.outputs[c]?.id, `out${c}`), true), { 'cursor-pointer': selectable }]" v-bind="pickable(rule, decision.outputs[c], r)">{{ value }}</span>
             <input
               v-else
               :value="value"
@@ -126,21 +128,25 @@
               :class="textClass(rule, cellState(rule, decision.outputs[c]?.id, `out${c}`))"
               spellcheck="false"
               :aria-label="`Rule ${r + 1}, result ${decision.outputs[c]?.label || decision.outputs[c]?.name}`"
+              :title="clipped(value, MONO, widths.outputs[c]) ? value : undefined"
               :data-cell="`${r}:${decision.inputs.length + c}`"
               @input="$emit('cell', r, 'out', c, $event.target.value)"
+              @focus="$emit('select', rule.id, decision.outputs[c]?.id)"
               @keydown="onKey($event, r, decision.inputs.length + c)"
             />
           </td>
-          <td class="cell note border-b border-l border-rule p-0 text-left align-middle" :class="[cellStates[`${rule.id}|description`], cellClass(rule, cellStates[`${rule.id}|description`] || '')]">
-            <span v-if="readonly" class="text" :class="textClass(rule, cellStates[`${rule.id}|description`] || '', true, true)">{{ rule.description }}</span>
+          <td class="cell note border-b border-l border-rule p-0 text-left align-middle" :class="[cellStates[`${rule.id}|description`], cellClass(rule, cellStates[`${rule.id}|description`] || ''), selClass(rule, null)]">
+            <span v-if="readonly" class="text" :class="[textClass(rule, cellStates[`${rule.id}|description`] || '', true, true), { 'cursor-pointer': selectable }]" v-bind="pickable(rule, null, r)">{{ rule.description }}</span>
             <input
               v-else
               :value="rule.description"
               class="text prose"
               :class="textClass(rule, cellStates[`${rule.id}|description`] || '', false, true)"
               :aria-label="`Rule ${r + 1}, note`"
+              :title="clipped(rule.description, PROSE, widths.note) ? rule.description : undefined"
               :data-cell="`${r}:${decision.inputs.length + decision.outputs.length}`"
               @input="$emit('description', r, $event.target.value)"
+              @focus="$emit('select', rule.id, null)"
               @keydown="onKey($event, r, decision.inputs.length + decision.outputs.length)"
             />
           </td>
@@ -169,7 +175,7 @@
 </template>
 
 <script setup>
-import { nextTick, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { ArrowDown, ArrowUp, CornerDownRight, Plus, Trash2 } from 'lucide-vue-next';
 import ColumnEditor from './ColumnEditor.vue';
 
@@ -187,12 +193,61 @@ const props = defineProps({
   // { [columnId]: 'edited'|'new' } — headings changed here and not saved.
   columnStates: { type: Object, default: () => ({}) },
   // Other tables' results a condition here could check: [{ name, typeRef, from, fromName, label }]
-  sources: { type: Array, default: () => [] }
+  sources: { type: Array, default: () => [] },
+  // What the history beside the grid follows: { ruleId, columnId, level } — outlined here.
+  selected: { type: Object, default: null },
+  // Read-only cells can be picked too, while the history is open: clicking one emits select.
+  selectable: { type: Boolean, default: false }
 });
-const emit = defineEmits(['cell', 'description', 'add-rule', 'remove-rule', 'move-rule', 'column', 'add-column', 'remove-column']);
+const emit = defineEmits(['cell', 'description', 'add-rule', 'remove-rule', 'move-rule', 'column', 'add-column', 'remove-column', 'select']);
 
 const wrap = ref(null);
 const editing = ref(null);
+
+// --- column widths ---------------------------------------------------------------------------------
+// Each column as wide as its longest value, within bounds, so a value is read whole instead of being
+// cut at a fixed width; past the bound it ends in an ellipsis and shows whole on hover. A table wider
+// than the screen scrolls inside the grid, as it always did.
+const fontOf = (size, variable, fallback) => `${size} ${getComputedStyle(document.documentElement).getPropertyValue(variable).trim() || fallback}`;
+const MONO = fontOf('13px', '--font-mono', 'monospace');
+const PROSE = fontOf('13px', '--font-sans', 'sans-serif');
+const HEAD = { label: fontOf('bold 12px', '--font-sans', 'sans-serif'), mono: fontOf('12px', '--font-mono', 'monospace'), sans: fontOf('12px', '--font-sans', 'sans-serif') };
+const PAD = 26; // the cell's padding either side, and the caret
+let context = null;
+const textWidth = (text, font) => {
+  context ??= document.createElement('canvas').getContext('2d');
+  context.font = font;
+  return context.measureText(String(text ?? '')).width;
+};
+// Measured again once the fonts have arrived: before that the browser measures with a fallback.
+const fontsReady = ref(false);
+document.fonts?.ready.then(() => { fontsReady.value = true; });
+const fit = (texts, font, min, max) => Math.round(Math.min(max, Math.max(min, ...texts.map((t) => textWidth(t, font) + PAD))));
+// A heading's lines: its label, its name and type, and the table it comes from or goes to.
+const headWidth = (label, name, type, link) => Math.max(
+  Math.min(220, textWidth(label, HEAD.label)),
+  (name ? textWidth(name, HEAD.mono) + 8 : 0) + textWidth(type || 'any', HEAD.sans),
+  link ? 16 + textWidth(link, HEAD.sans) : 0
+) + PAD;
+const widths = computed(() => {
+  void fontsReady.value;
+  const rules = props.decision.rules || [];
+  const inputs = props.decision.inputs.map((col, c) => Math.max(
+    fit(rules.map((r) => r.inputs[c]), MONO, 120, 340),
+    headWidth(col.label || col.expression, col.label && col.expression, col.typeRef, props.fedBy[col.expression?.trim()] && `from ${props.fedBy[col.expression.trim()]}`)
+  ));
+  const outputs = props.decision.outputs.map((col, c) => Math.max(
+    fit(rules.map((r) => r.outputs[c]), MONO, 120, 340),
+    headWidth(col.label || col.name, col.label && col.name, col.typeRef, props.feeds[col.name] && `to ${props.feeds[col.name]}`)
+  ));
+  const note = fit(rules.map((r) => r.description), PROSE, 200, 420);
+  // The table is never narrower than its columns: a cell holding an input has no width of its own,
+  // so a squeezed table would cut values instead of scrolling.
+  const columns = [...inputs, ...outputs];
+  const total = 44 + columns.reduce((a, b) => a + b, 0) + note + (props.readonly ? 0 : 128) + columns.length + 4; // and the borders
+  return { inputs, outputs, note, total };
+});
+const clipped = (text, font, width) => !!text && textWidth(text, font) + PAD > width;
 
 const toggle = async (side, index) => {
   editing.value = editing.value?.side === side && editing.value.index === index ? null : { side, index };
@@ -210,6 +265,27 @@ async function addColumn(side) {
   await nextTick();
   toggle(side, index);
 }
+
+// --- the pick the history follows -------------------------------------------------------------------
+const selectedLevel = (level) => props.selected?.level === level;
+function selClass(rule, columnId) {
+  const s = props.selected;
+  if (!s || !rule.id) return '';
+  if (s.level === 'CELL') return s.ruleId === rule.id && s.columnId === columnId && columnId ? 'sel-cell' : '';
+  if (s.level === 'RULE') return s.ruleId === rule.id ? 'sel-row' : '';
+  if (s.level === 'COLUMN') return s.columnId === columnId && columnId ? 'sel-col' : '';
+  return '';
+}
+// A read-only cell, when it can be picked: a button to the keyboard and to a screen reader.
+const pickable = (rule, column, r) => (props.selectable && rule.id
+  ? {
+      role: 'button',
+      tabindex: 0,
+      'aria-label': `Rule ${r + 1}${column ? `, ${column.label || column.expression || column.name}` : ', note'}: pick it for the history`,
+      onClick: () => emit('select', rule.id, column?.id || null),
+      onKeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); emit('select', rule.id, column?.id || null); } }
+    }
+  : {});
 
 const rowState = (rule) => (rule.id && props.rowStates[rule.id]) || '';
 // Merge conflicts name a column by position in the merged table (in0, out1); diffs by its id.
@@ -266,7 +342,7 @@ function textClass(rule, state, isSpan = false, prose = false) {
   return [
     'block min-h-9 w-full border-0 bg-transparent px-3 py-2 leading-5',
     prose ? 'font-sans text-sm text-ink-2' : 'font-mono text-[0.8125rem]',
-    isSpan ? 'whitespace-pre-wrap wrap-anywhere' : 'placeholder:text-ink-3 focus:bg-select focus:outline-none focus:ring-[1.5px] focus:ring-inset focus:ring-ink',
+    isSpan ? 'whitespace-pre-wrap wrap-anywhere' : 'text-ellipsis placeholder:text-ink-3 focus:bg-select focus:outline-none focus:ring-[1.5px] focus:ring-inset focus:ring-ink',
     state === 'edited' ? '!text-edit-ink font-semibold' : '',
     f.has('removed') ? 'line-through !text-ink-2' : ''
   ];
@@ -302,4 +378,12 @@ tbody .num { position: sticky; left: 0; z-index: 2; }
 .tools { z-index: 2; }
 .tools-head { z-index: 4; }
 tbody tr:last-child > * { border-bottom: 0; }
+
+/* What the history follows, outlined in ink over whatever state the cell shows: one cell, a rule's
+   row, or a column from its heading down. Drawn on a layer above the cell so its colours stay. */
+td.sel-cell, td.sel-row, td.sel-col { position: relative; }
+.sel-cell::after, .sel-row::after, .sel-col::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.sel-cell::after { box-shadow: inset 0 0 0 2px var(--color-ink); }
+.sel-row::after { box-shadow: inset 0 2px 0 var(--color-ink), inset 0 -2px 0 var(--color-ink); }
+.sel-col::after { box-shadow: inset 2px 0 0 var(--color-ink), inset -2px 0 0 var(--color-ink); }
 </style>

@@ -1,6 +1,7 @@
 package limitium.art.camunda.backend.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import limitium.art.camunda.backend.assistant.AssistantProperties;
 import limitium.art.camunda.backend.config.AuthProperties;
 import limitium.art.camunda.backend.config.GitProperties;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +23,7 @@ public class AppController {
 
     private final GitProperties git;
     private final AuthProperties auth;
+    private final AssistantProperties assistant;
 
     @Value("${dmn.role:author}")
     private String role;
@@ -32,9 +34,10 @@ public class AppController {
     @Value("${dmn.deploy.allow-draft-publish:false}")
     private boolean allowDraftPublish;
 
-    public AppController(GitProperties git, AuthProperties auth) {
+    public AppController(GitProperties git, AuthProperties auth, AssistantProperties assistant) {
         this.git = git;
         this.auth = auth;
+        this.assistant = assistant;
     }
 
     @GetMapping
@@ -50,6 +53,7 @@ public class AppController {
         body.put("gitEnabled", git.isEnabled());
         body.put("mainBranch", git.getMainBranch());
         body.put("allowDraftPublish", allowDraftPublish);
+        body.put("assistant", assistant.isEnabled());
         return body;
     }
 }

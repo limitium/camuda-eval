@@ -1,14 +1,14 @@
 <template>
   <div class="page-body">
     <h1>Try it in an application</h1>
-    <p class="lede">Publishing puts this work space’s saved version of the rules an application reads onto that application’s topic, so the application uses it straight away. Every test runs first.</p>
+    <p class="lede">Publishing puts this work space’s committed rules that an application reads onto that application’s topic, so the application uses them straight away. Every test runs first.</p>
 
     <p v-if="loadError" class="notice notice-needs mt-7">{{ loadError }}</p>
     <p v-else-if="!rows" class="loading mt-7">Reading the applications…</p>
 
     <template v-else>
-      <p v-if="!app.info.allowDraftPublish" class="notice mt-7">Drafts are not published from the {{ app.info.env }} instance. Land it and release it instead.</p>
-      <p v-else-if="space.changes.length" class="notice notice-needs mt-7">You have changes that are not in a saved version. Only a saved version can be tried — <router-link :to="spacePath(spaceId, '/version')" class="font-semibold">save one first</router-link>.</p>
+      <p v-if="!app.info.allowDraftPublish" class="notice mt-7">Drafts are not published from the {{ app.info.env }} instance. Merge it and tag a release instead.</p>
+      <p v-else-if="space.changes.length" class="notice notice-needs mt-7">You have changes that are not committed yet. Only committed changes can be tried — <router-link :to="spacePath(spaceId, '/version')" class="font-semibold">commit them first</router-link>.</p>
 
       <!-- Done: the result, highlighted, in place of the form. -->
       <section
@@ -18,7 +18,7 @@
         role="status"
       >
         <template v-if="published.complete">
-          <p class="flex items-center gap-2 text-lg font-bold"><Check :size="20" :stroke-width="1.75" class="text-clean-ink" aria-hidden="true" /> {{ published.application }} runs this work space’s version now</p>
+          <p class="flex items-center gap-2 text-lg font-bold"><Check :size="20" :stroke-width="1.75" class="text-clean-ink" aria-hidden="true" /> {{ published.application }} runs this work space’s changes now</p>
           <p>Published {{ published.files.join(', ') }} at <router-link :to="`/commit/${published.commit}`" class="mono">{{ published.commit.slice(0, 7) }}</router-link> to {{ published.application }}’s topic, after all {{ published.tests.total }} test {{ published.tests.total === 1 ? 'case' : 'cases' }} passed. Everyone using {{ published.application }} uses it until a release is put back.</p>
           <div class="mt-1 flex flex-wrap gap-2">
             <router-link :to="`/applications/${published.application}`" class="btn">See {{ published.application }}</router-link>
@@ -54,14 +54,14 @@
 
         <!-- 2. The tests, already running -->
         <div class="mt-7 grid max-w-[860px] gap-2.5">
-          <p class="label !mb-0 flex items-center text-ink"><span class="mr-1.5 inline-grid size-5 place-items-center rounded-full border border-rule-strong text-xs font-bold text-ink-2">2</span> Every test at this version</p>
+          <p class="label !mb-0 flex items-center text-ink"><span class="mr-1.5 inline-grid size-5 place-items-center rounded-full border border-rule-strong text-xs font-bold text-ink-2">2</span> Every test at this commit</p>
           <TestReport :report="report" :busy="testing" :rev="space.info?.head?.slice(0, 7) || ''" />
         </div>
 
         <!-- 3. Agree, knowing what it replaces -->
         <div v-if="picked" class="mt-7 grid max-w-[860px] gap-2.5">
           <p class="label !mb-0 flex items-center text-ink"><span class="mr-1.5 inline-grid size-5 place-items-center rounded-full border border-rule-strong text-xs font-bold text-ink-2">3</span> What it replaces</p>
-          <p v-if="runsThis" class="notice">{{ picked.name }} already runs this version (published {{ whenText(picked.version.publishedAt) }}). Publishing again repeats it.</p>
+          <p v-if="runsThis" class="notice">{{ picked.name }} already runs this commit (published {{ whenText(picked.version.publishedAt) }}). Publishing again repeats it.</p>
           <div class="notice notice-live grid gap-1.5">
             <p><strong class="font-bold">This replaces what {{ picked.name }} runs, for everyone using it</strong> — the application reads each file under a fixed name, so there is no private copy. Putting the last release back is one step on {{ picked.name }}’s page.</p>
             <p v-if="picked.version && picked.version.workspace && picked.version.workspace !== spaceId">It runs {{ branchName(picked.version.workspace, app.info.mainBranch) }} now ({{ whenText(picked.version.publishedAt) }}); publishing replaces it — tell them.</p>
@@ -83,6 +83,7 @@ import { Check } from 'lucide-vue-next';
 import TestReport from '../components/TestReport.vue';
 import { api } from '../lib/api';
 import { useBar } from '../lib/bar';
+import { useAssistant } from '../lib/assistant';
 import { space } from '../lib/space';
 import { app, branchName, spaceIdFromRoute, spacePath, whenText } from '../store';
 
@@ -98,7 +99,7 @@ const report = ref(null);
 const testing = ref(false);
 
 const published = ref(null);
-// The picked application already runs exactly this saved version.
+// The picked application already runs exactly this commit.
 const runsThis = computed(() => !!picked.value?.version && picked.value.version.commit === space.info?.head);
 function again() {
   published.value = null;
@@ -141,7 +142,7 @@ async function publish() {
     window.scrollTo?.({ top: 0, behavior: 'smooth' });
     document.getElementById('stage')?.scrollTo?.({ top: 0, behavior: 'smooth' });
     if (result.complete) {
-      app.say(`${domain.value} runs this work space’s version now. Everyone using it does, until a release is put back.`, 'live');
+      app.say(`${domain.value} runs this work space’s changes now. Everyone using it does, until a release is put back.`, 'live');
       rows.value = await api.draftPreview(spaceId);
       confirmed.value = false;
     } else {
@@ -155,19 +156,37 @@ async function publish() {
   }
 }
 
+useAssistant(() => ({
+  now: !app.info.allowDraftPublish ? 'Trying a work space is not allowed on this environment.'
+    : space.changes.length ? 'This work space has uncommitted changes: commit them first; only a commit can be published.'
+      : !rows.value ? 'The applications are still being read.'
+        : `This work space’s last commit can be published to an application here: ${(rows.value || []).map((d) => `${d.name} (runs ${describe(d.version)}; ${d.changed.length ? `this work space changed ${d.changed.join(', ')} it reads` : 'it reads nothing this work space changed'})`).join('; ')}.`,
+  applications: (rows.value || []).map((d) => d.name),
+  published: published.value ? `${published.value.application}: ${published.value.complete ? 'runs it now' : `did not take it — ${published.value.error}`}` : null
+}), {
+  // As its own button does, after the person confirmed the card instead of the box on the screen.
+  async publish(p) {
+    domain.value = p.application;
+    confirmed.value = true;
+    await publish();
+    if (!published.value?.complete) throw new Error(published.value?.error || 'nothing was published — the bar below says why');
+    return `${p.application} runs this work space’s last commit`;
+  }
+});
+
 useBar(() => {
   if (published.value?.complete) {
     return {
       secondary: [{ label: `See ${published.value.application}`, quiet: true, run: () => router.push(`/applications/${published.value.application}`) }],
-      primary: { label: 'Go on to landing', run: () => router.push(spacePath(spaceId, '/land')) }
+      primary: { label: 'Go on to merging', run: () => router.push(spacePath(spaceId, '/land')) }
     };
   }
   const ready = app.info.allowDraftPublish && !space.changes.length && picked.value;
   return {
-    secondary: [{ label: 'Skip to landing', quiet: true, run: () => router.push(spacePath(spaceId, '/land')) }],
+    secondary: [{ label: 'Skip to merging', quiet: true, run: () => router.push(spacePath(spaceId, '/land')) }],
     hint: !domain.value ? 'Choose an application.'
       : testing.value ? 'Running every test…'
-        : report.value && !report.value.passed ? 'Tests fail in this version, so it cannot be published.'
+        : report.value && !report.value.passed ? 'Tests fail in this commit, so it cannot be published.'
           : !confirmed.value ? 'Tick the box to agree, then publish.' : null,
     primary: ready
       ? { label: `${runsThis.value ? 'Publish again to' : 'Publish to'} ${picked.value.name}`, run: publish, busy: busy.value, disabled: !confirmed.value || testing.value || !report.value?.passed }

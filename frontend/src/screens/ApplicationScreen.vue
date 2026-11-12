@@ -19,10 +19,10 @@
           <div v-if="domain.version.release" class="flex flex-wrap items-center gap-x-3 gap-y-1">
             <LineBullet v-if="runsOn" :line="runsOn" :main-branch="app.info.mainBranch" :title="lineName(runsOn, app.info.mainBranch)" />
             <span class="text-lg leading-none"><span class="tag">{{ domain.version.release }}</span></span>
-            <span class="font-semibold">release {{ domain.version.line?.slice(8) }}</span>
+            <span class="font-semibold">{{ domain.version.line }}</span>
             <span class="state" :class="domain.inStep && !domain.problems?.length ? 'state-clean' : 'state-needs'">{{ domain.inStep && !domain.problems?.length ? 'running' : 'problem' }}</span>
             <span class="meta">deployed by {{ domain.version.publishedBy }} {{ whenText(domain.version.publishedAt) }}</span>
-            <span v-if="!domain.inStep" class="state state-needs">its files run different versions — redeploy</span>
+            <span v-if="!domain.inStep" class="state state-needs">its files run different commits — redeploy</span>
           </div>
           <!-- A draft runs: loud through the state word and one amber rule, not a box. -->
           <div v-else class="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-live px-1 pt-3">
@@ -30,7 +30,7 @@
             <LineBullet v-if="runsOn" :line="runsOn" :main-branch="app.info.mainBranch" size="sm" :title="lineName(runsOn, app.info.mainBranch)" />
             <span class="font-semibold">{{ branchName(domain.version.workspace, app.info.mainBranch) }}, built on {{ builtOn }}</span>
             <span class="meta">deployed by {{ domain.version.publishedBy }} {{ whenText(domain.version.publishedAt) }}</span>
-            <span v-if="!domain.inStep" class="state state-needs">its files run different versions — redeploy</span>
+            <span v-if="!domain.inStep" class="state state-needs">its files run different commits — redeploy</span>
           </div>
           <div class="rows">
             <router-link v-for="f in domain.running" :key="f.name" :to="`/commit/${f.commit}/${f.name}`" class="group flex min-h-12 items-center gap-3.5 px-1 py-3 no-underline hover:bg-hover">
@@ -45,7 +45,7 @@
       <!-- 2. Start a work space from what runs. -->
       <section v-if="app.author && domain.version" class="mt-9 grid max-w-[860px] gap-2.5">
         <h2 class="text-sm font-bold text-ink-2">Change it</h2>
-        <p class="meta">Start a work space from exactly what runs here{{ domain.version.release ? ` — a fix to ${domain.version.release}, landing in release ${domain.version.line?.slice(8)} and carried forward` : '' }}.</p>
+        <p class="meta">Start a work space from exactly what runs here{{ domain.version.release ? ` — a fix to ${domain.version.release}, merging into ${domain.version.line}, then into every newer release branch and ${app.info.mainBranch}` : '' }}.</p>
         <form class="flex flex-wrap items-center gap-2" @submit.prevent="startSpace">
           <label class="label m-0 w-full" for="space-name">Name of the work space</label>
           <input id="space-name" v-model="spaceName" class="field max-w-[320px]" autocomplete="off" />
@@ -54,12 +54,12 @@
         </form>
       </section>
 
-      <!-- 3. Deploy a version. -->
+      <!-- 3. Deploy a tag. -->
       <section class="mt-9 grid max-w-[860px] gap-2.5">
-        <h2 class="text-sm font-bold text-ink-2">Deploy a version</h2>
-        <p class="meta">{{ domain.name }} takes the version’s {{ domain.files.join(', ') }}. Every test runs first; one failing test stops it.</p>
-        <select v-model="version" class="field max-w-[460px]" aria-label="Version to deploy">
-          <option value="" disabled>choose a released version</option>
+        <h2 class="text-sm font-bold text-ink-2">Deploy a tag</h2>
+        <p class="meta">{{ domain.name }} takes the tag’s {{ domain.files.join(', ') }}. Every test runs first; one failing test stops it.</p>
+        <select v-model="version" class="field max-w-[460px]" aria-label="Tag to deploy">
+          <option value="" disabled>choose a release tag</option>
           <option v-for="v in versions" :key="v.name" :value="v.name">{{ v.name }}{{ v.verified ? '' : ' (made by hand, not verified)' }}{{ v.notes && v.notes !== v.name ? ` — ${v.notes}` : '' }}</option>
         </select>
         <TestReport v-if="version" :report="report" :busy="testing" :error="testError" :rev="version" />
@@ -111,6 +111,7 @@ import LineBullet from '../components/LineBullet.vue';
 import TestReport from '../components/TestReport.vue';
 import { api } from '../lib/api';
 import { useBar } from '../lib/bar';
+import { testsText, useAssistant } from '../lib/assistant';
 import { app, branchName, branchSlug, lineName, spacePath, whenText } from '../store';
 
 /*
@@ -141,13 +142,13 @@ const builtOn = computed(() => {
   return !b ? 'an unknown starting point' : /^v\d/.test(b) ? b : lineName(b, app.info.mainBranch);
 });
 
-// release/M.m for a version vM.m.p.
+// release/M.m for a tag vM.m.p.
 const lineOfTag = (tag) => {
   const m = /^v(\d+)\.(\d+)/.exec(tag || '');
   return m ? `release/${m[1]}.${m[2]}` : null;
 };
 
-// The line what runs belongs to: a release's own line; a draft's, the line it lands in.
+// The branch what runs belongs to: a release tag's own release branch; a draft's, the branch it merges into.
 const runsOn = computed(() => {
   const v = domain.value?.version;
   if (!v) return null;
@@ -193,28 +194,36 @@ watch(version, async (v) => {
   }
 });
 
+// Returns what came of it (the result of the deploy, or null when refused): the screen resets its own
+// copy as soon as the tag is unchosen, so a caller reads this, not that.
 async function deploy() {
   busy.value = true;
   try {
-    outcome.value = await api.deploy(name, version.value);
-    app.say(outcome.value.complete ? `${name} runs ${version.value} now.` : `${name}’s topic did not take ${version.value}; redeploy once it can be reached.`, outcome.value.complete ? 'live' : 'needs');
+    const result = await api.deploy(name, version.value);
+    outcome.value = result;
+    app.say(result.complete ? `${name} runs ${version.value} now.` : `${name}’s topic did not take ${version.value}; redeploy once it can be reached.`, result.complete ? 'live' : 'needs');
     version.value = '';
+    return result;
   } catch (e) {
     if (e.body?.code === 'TESTS_FAILED') report.value = e.body.details;
     app.say(`Nothing was deployed: ${e.message}`, 'needs');
+    return { complete: false, error: e.message };
   } finally {
     busy.value = false;
     load();
   }
 }
 
+// Says what came of it, and returns why it did not work (null when it did).
 async function act(call, said) {
   busy.value = true;
   try {
     const r = await call();
     app.say(r.complete === false ? `The topic did not take it: ${r.error}` : said, r.complete === false ? 'needs' : 'live');
+    return r.complete === false ? `the topic did not take it: ${r.error}` : null;
   } catch (e) {
     app.say(`Nothing changed: ${e.message}`, 'needs');
+    return e.message;
   } finally {
     busy.value = false;
     load();
@@ -242,6 +251,65 @@ onMounted(() => {
   loadVersions();
 });
 
+useAssistant(() => {
+  const d = domain.value;
+  if (!d) return { application: name, state: error.value || 'still being read' };
+  const v = d.version;
+  const runs = !v ? `${d.name} runs nothing yet` : v.release ? `${d.name} runs tag ${v.release}` : `${d.name} runs a draft of ${v.workspace}, not a release`;
+  const chosen = version.value;
+  return {
+    now: !d.ok ? `${d.name}’s topic cannot be read (${d.error}): nothing can be deployed to it until it can.`
+      : !versions.value.length ? `${runs}. There is no tag yet, so nothing can be deployed here: ${app.author
+        ? 'a tag is made on Releases, on a commit of a release branch (a change still in a work space is merged first).'
+        : 'this instance only deploys, so tags are not made here — they are made on an authoring instance (such as dev) and appear here once made.'}`
+        : !chosen ? `${runs}. To deploy, choose a tag in Deploy a tag; ${versions.value.length} can be deployed.`
+          : testing.value ? `${runs}. ${chosen} is chosen and its tests are running.`
+            : report.value && !report.value.passed ? `${runs}. ${chosen} is chosen, but its tests fail at that tag, so it cannot be deployed.`
+              : `${runs}. ${chosen} is chosen${report.value?.passed ? ' and every test passes' : ''}: press Deploy ${chosen} to ${d.name}.`,
+    application: d.name,
+    readsDomains: d.files,
+    topicReadable: d.ok ? 'yes' : `no: ${d.error}`,
+    problems: d.problems || [],
+    runsNow: !v ? 'nothing deployed yet'
+      : v.release ? `tag ${v.release} of ${runsOn.value}, deployed by ${v.publishedBy} ${whenText(v.publishedAt)}`
+        : `a draft: work space ${v.workspace}, built on ${builtOn.value}, deployed by ${v.publishedBy} ${whenText(v.publishedAt)} — not a release`,
+    domainsRunTheSameCommit: v ? (d.inStep ? 'yes' : 'no — redeploy') : null,
+    tagsThatCanBeDeployed: versions.value.map((t) => `${t.name}${t.verified ? '' : ' (made by hand, not verified)'}${t.notes && t.notes !== t.name ? ` — ${t.notes}` : ''}`),
+    tagChosenInDeployATag: version.value || 'none yet',
+    testsAtTheChosenTag: version.value ? testsText(report.value, testing.value, testError.value) : null,
+    lastDeployHere: outcome.value ? (outcome.value.complete ? 'it took the tag' : `not taken: ${outcome.value.error}`) : null,
+    recentDeployments: (d.history || []).slice(0, 5).map((h) => `${whenText(h.at)}: ${h.release ? `tag ${h.release}` : h.workspace ? `draft of ${h.workspace}` : `stopped ${h.stopped.join(', ')}`}${h.by ? ` by ${h.by}` : ''}`),
+    // What the actions are checked against.
+    tags: versions.value.map((t) => t.name),
+    runsSomething: !!v,
+    runsRelease: !!v?.release,
+    draftRuns: !!v && !v.release,
+    canStartWorkSpace: app.author && !!v
+  };
+}, {
+  // Each runs what the screen's own button runs, and says when nothing came of it.
+  async deploy(p) {
+    version.value = p.tag;
+    const result = await deploy();
+    if (!result?.complete) throw new Error(result?.error || 'nothing was deployed — the bar below says why');
+    return `${name} runs ${p.tag}`;
+  },
+  async redeploy() {
+    const failed = await act(() => api.redeploy(name), `Redeployed ${name}.`);
+    if (failed) throw new Error(failed);
+  },
+  async restore_release() {
+    const failed = await act(() => api.restoreRelease(name), `${name} is back on its last release.`);
+    if (failed) throw new Error(failed);
+    return `${name} is back on its last release`;
+  },
+  async start_work_space(p) {
+    spaceName.value = p.name;
+    await startSpace();
+    if (route.path.startsWith('/applications/')) throw new Error('no work space was started — the bar below says why');
+  }
+});
+
 useBar(() => {
   const d = domain.value;
   if (!d) return {};
@@ -253,9 +321,9 @@ useBar(() => {
   // The one next action is deploying the chosen version; until one is chosen it waits, with a hint.
   return {
     secondary,
-    hint: !version.value ? 'Choose a version to deploy it.' : testing.value ? 'Running every test…' : report.value && !report.value.passed ? 'Tests fail at this version, so it cannot be deployed.' : null,
+    hint: !version.value ? 'Choose a tag to deploy it.' : testing.value ? 'Running every test…' : report.value && !report.value.passed ? 'Tests fail at this tag, so it cannot be deployed.' : null,
     primary: {
-      label: version.value ? `Deploy ${version.value} to ${name}` : 'Deploy a version',
+      label: version.value ? `Deploy ${version.value} to ${name}` : 'Deploy a tag',
       run: deploy,
       busy: busy.value,
       disabled: !version.value || !report.value?.passed || testing.value

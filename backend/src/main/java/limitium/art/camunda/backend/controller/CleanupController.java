@@ -59,7 +59,7 @@ public class CleanupController {
             sync.run(); // tidy against what every instance sees
         }
         if (!properties.isEnabled()) {
-            return error(HttpStatus.NOT_FOUND, "this instance keeps no version history, so there is nothing to tidy");
+            return error(HttpStatus.NOT_FOUND, "this instance keeps no git history, so there is nothing to tidy");
         }
         try {
             Map<String, Object> body = new LinkedHashMap<>();
@@ -120,7 +120,7 @@ public class CleanupController {
     /** A deploy-only instance changes nothing in the history. */
     private ResponseEntity<?> refuse() {
         if (!properties.isEnabled()) {
-            return error(HttpStatus.NOT_FOUND, "this instance keeps no version history");
+            return error(HttpStatus.NOT_FOUND, "this instance keeps no git history");
         }
         if ("deployer".equals(role)) {
             return error(HttpStatus.FORBIDDEN, "this instance only deploys");

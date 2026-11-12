@@ -112,8 +112,8 @@ public class GitRuleStore {
         public final String commit;
 
         public NotShared(String commit, String reason) {
-            super("the version was saved in this space but could not be shared: " + reason
-                    + ". It is kept, and saving again shares it.");
+            super("the commit was made in this space but could not be shared: " + reason
+                    + ". It is kept, and committing again shares it.");
             this.commit = commit;
         }
     }
@@ -419,14 +419,14 @@ public class GitRuleStore {
                     git.reset().setMode(org.eclipse.jgit.api.ResetCommand.ResetType.SOFT).setRef(before.getName()).call();
                 }
                 if ("REMOTE_UNREACHABLE".equals(e.code)) {
-                    throw new NotSaved("REMOTE_UNREACHABLE", "the shared repository could not be reached, so nothing was saved; your changes are kept here, unsaved — save again when it can be reached");
+                    throw new NotSaved("REMOTE_UNREACHABLE", "the shared repository could not be reached, so nothing was committed; your changes are kept here, uncommitted — commit again when it can be reached");
                 }
                 throw behind(id);
             } catch (GitAPIException e) {
                 if (made && before != null) {
                     git.reset().setMode(org.eclipse.jgit.api.ResetCommand.ResetType.SOFT).setRef(before.getName()).call();
                 }
-                throw new NotSaved("REMOTE_UNREACHABLE", "nothing was saved: " + e.getMessage());
+                throw new NotSaved("REMOTE_UNREACHABLE", "nothing was committed: " + e.getMessage());
             } finally {
                 try (Git main = Git.open(mainCheckout().toFile())) {
                     RefUpdate drop = main.getRepository().updateRef(holding);
@@ -453,8 +453,8 @@ public class GitRuleStore {
                 // the message is enough without it
             }
         }
-        return new NotSaved("BEHIND", "a newer version of this space was saved" + where
-                + "; nothing was saved — refresh to continue from it. Your changes are kept, unsaved");
+        return new NotSaved("BEHIND", "this space has a newer commit" + where
+                + "; nothing was committed — pull to continue from it. Your changes are kept, uncommitted");
     }
 
     /** The instance a version was saved on, read from its committer; null when unknown. */
@@ -605,10 +605,9 @@ public class GitRuleStore {
 
                 for (Ref ref : git.tagList().call()) {
                     String tag = ref.getName().substring(Constants.R_TAGS.length());
-                    if (!tag.matches("v\\d+\\.\\d+\\.\\d+")) {
+                    if (!ReleaseNames.isTag(tag)) {
                         continue;
                     }
-                    String[] parts = tag.substring(1).split("\\.");
                     ObjectId peeled = repository.getRefDatabase().peel(ref).getPeeledObjectId();
                     RevCommit commit = walk.parseCommit(peeled != null ? peeled : ref.getObjectId());
                     // A release's own notes and date say what it is; the commit under it may be older.
@@ -623,7 +622,7 @@ public class GitRuleStore {
                         }
                     }
                     RevCommit fork = forkOf(firstParents(walk, commit), onMain);
-                    result.add(new Baseline(tag, "VERSION", "release/" + parts[0] + "." + parts[1],
+                    result.add(new Baseline(tag, "VERSION", ReleaseNames.branchOfTag(tag, tagged instanceof RevTag ? ((RevTag) tagged).getFullMessage() : null),
                             when, notes, commit.getName(), fork, Collections.<Carry>emptyList()));
                 }
             }
@@ -771,7 +770,10 @@ public class GitRuleStore {
                         lanes.put(c, mainName);
                     }
                 }
-                for (Map.Entry<String, RevCommit> tip : tips.entrySet()) {
+                // Release branches oldest first, by their numbers: an older branch owns the commits it shares.
+                List<Map.Entry<String, RevCommit>> releaseTips = new ArrayList<>(tips.entrySet());
+                releaseTips.sort(Comparator.comparing((Map.Entry<String, RevCommit> e) -> ReleaseNames.branchKey(e.getKey())));
+                for (Map.Entry<String, RevCommit> tip : releaseTips) {
                     if (!tip.getKey().equals(mainName)) {
                         laneList.add(new HistoryLane(tip.getKey(), "LINE", null, null, null));
                         claim(walk, tip.getValue(), tip.getKey(), lanes);
@@ -789,7 +791,7 @@ public class GitRuleStore {
                 java.util.Set<String> goneLines = new java.util.LinkedHashSet<>();
                 for (Ref ref : git.tagList().call()) {
                     String tag = ref.getName().substring(Constants.R_TAGS.length());
-                    if (!tag.matches("v\\d+\\.\\d+\\.\\d+")) {
+                    if (!ReleaseNames.isTag(tag)) {
                         continue;
                     }
                     ObjectId peeled = repository.getRefDatabase().peel(ref).getPeeledObjectId();
@@ -799,8 +801,7 @@ public class GitRuleStore {
                     version.put("ref", tag);
                     version.put("notes", tagged instanceof RevTag
                             ? ((RevTag) tagged).getShortMessage() : commit.getShortMessage());
-                    String[] parts = tag.substring(1).split("\\.");
-                    version.put("line", "release/" + parts[0] + "." + parts[1]);
+                    version.put("line", ReleaseNames.branchOfTag(tag, tagged instanceof RevTag ? ((RevTag) tagged).getFullMessage() : null));
                     versions.computeIfAbsent(commit, k -> new ArrayList<>()).add(version);
                     if (!lanes.containsKey(commit)) {
                         lanes.put(commit, version.get("line"));
@@ -1012,7 +1013,35 @@ public class GitRuleStore {
         }
     }
 
+    /** The newest commit two revisions share — where a work space left the branch it merges into. */
+    public String mergeBase(String a, String b) throws IOException {
+        try (Git git = Git.open(mainCheckout().toFile()); RevWalk walk = new RevWalk(git.getRepository())) {
+            ObjectId left = git.getRepository().resolve(a + "^{commit}");
+            ObjectId right = git.getRepository().resolve(b + "^{commit}");
+            if (left == null || right == null) {
+                return null;
+            }
+            walk.setRevFilter(org.eclipse.jgit.revwalk.filter.RevFilter.MERGE_BASE);
+            walk.markStart(walk.parseCommit(left));
+            walk.markStart(walk.parseCommit(right));
+            RevCommit base = walk.next();
+            return base == null ? null : base.getName();
+        }
+    }
+
     /** The commit a revision names, or null. */
+    /** The release branch a tag was made on, as its annotation records it (an older tag: by its numbers). */
+    public String releaseBranchOf(String tag) throws IOException {
+        try (Git git = Git.open(mainCheckout().toFile()); RevWalk walk = new RevWalk(git.getRepository())) {
+            Ref ref = git.getRepository().exactRef(Constants.R_TAGS + tag);
+            if (ref == null) {
+                return ReleaseNames.branchOfTag(tag, null);
+            }
+            RevObject object = walk.parseAny(ref.getObjectId());
+            return ReleaseNames.branchOfTag(tag, object instanceof RevTag ? ((RevTag) object).getFullMessage() : null);
+        }
+    }
+
     public String resolve(String revision) throws IOException {
         try (Git git = Git.open(mainCheckout().toFile())) {
             ObjectId id = git.getRepository().resolve(revision + "^{commit}");
@@ -1314,7 +1343,7 @@ public class GitRuleStore {
                 String name = shortName(ref.getName());
                 if (name.equals(properties.getMainBranch())) {
                     main = ref;
-                } else if (name.matches("release/\\d+\\.\\d+")) {
+                } else if (ReleaseNames.isBranch(name)) {
                     lines.add(ref);
                 } else if (WorkspaceId.parse(name) != null) {
                     spaces.add(ref);
@@ -1355,9 +1384,10 @@ public class GitRuleStore {
     }
 
     /**
-     * The landing of this space's newest saved version, if it has landed: the commit on its line that
-     * says "Land <branch> into <line>" and holds the space's head. Read from git, so a landing made on
-     * any instance counts. Null when not landed (or landed, then saved again).
+     * The merge of this space's newest commit, if it has been merged: the commit on its line that
+     * says "Merge <branch> into <line>" (or "Land <branch> into <line>", as older merges say) and holds
+     * the space's head. Read from git, so a merge made on any instance counts. Null when not merged (or
+     * merged, then committed again).
      */
     public Map<String, String> landing(WorkspaceId id, String targetLine) throws IOException {
         String head = sharedHead(id);
@@ -1376,13 +1406,20 @@ public class GitRuleStore {
             }
             walk.markStart(walk.parseCommit(line));
             walk.setRevFilter(org.eclipse.jgit.revwalk.filter.RevFilter.ONLY_MERGES);
-            String prefix = "Land " + id.branch() + " into ";
+            // New merges say "Merge <branch> into <line>"; ones made before the wording changed say "Land".
+            String[] prefixes = {"Merge " + id.branch() + " into ", "Land " + id.branch() + " into "};
             int seen = 0;
             for (RevCommit c : walk) {
                 if (++seen > 500) {
                     break;
                 }
-                if (c.getShortMessage().startsWith(prefix) && c.getParentCount() > 1 && c.getParent(1).getName().equals(head)) {
+                String prefix = null;
+                for (String p : prefixes) {
+                    if (c.getShortMessage().startsWith(p)) {
+                        prefix = p;
+                    }
+                }
+                if (prefix != null && c.getParentCount() > 1 && c.getParent(1).getName().equals(head)) {
                     Map<String, String> landed = new java.util.LinkedHashMap<>();
                     landed.put("sha", c.getName());
                     landed.put("line", c.getShortMessage().substring(prefix.length()));
@@ -1500,11 +1537,11 @@ public class GitRuleStore {
         try (Git git = Git.open(checkoutOf(id).toFile())) {
             requireSpace(id);
             if (!git.status().call().isClean()) {
-                throw new IllegalStateException("there are unsaved changes in this space; save or undo them first, then bring the changes in");
+                throw new IllegalStateException("there are uncommitted changes in this space; commit or undo them first, then merge");
             }
             ObjectId head = git.getRepository().resolve(Constants.HEAD);
             if (head == null || !head.getName().equals(expectedHead) || !expectedHead.equals(sharedHead(id))) {
-                throw new IllegalStateException("this space was saved again meanwhile; look at the changes again");
+                throw new IllegalStateException("this space has a newer commit meanwhile; look at the changes again");
             }
             try (Git main = Git.open(mainCheckout().toFile())) {
                 RefUpdate update = main.getRepository().updateRef(Constants.R_HEADS + id.branch());
@@ -1699,7 +1736,7 @@ public class GitRuleStore {
                             break;
                         case REJECTED_NONFASTFORWARD:
                         case REJECTED_REMOTE_CHANGED:
-                            refused.put(update.getRemoteName(), "another instance saved a newer version of it; both versions are kept, and they need joining");
+                            refused.put(update.getRemoteName(), "another instance committed to it too; both are kept, and they need joining");
                             break;
                         default:
                             refused.put(update.getRemoteName(), update.getStatus()

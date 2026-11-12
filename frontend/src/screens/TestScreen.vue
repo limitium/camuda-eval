@@ -24,18 +24,18 @@
         </ul>
       </div>
       <p v-if="!targets.length && space.loading" class="loading px-1 py-5">Reading what changed…</p>
-      <p v-if="!targets.length && !space.loading && !savedReport" class="meta px-1 py-5">{{ ws ? 'Nothing has changed in this work space since its last version, so there is nothing new to test.' : 'There are no tables yet.' }}</p>
+      <p v-if="!targets.length && !space.loading && !savedReport" class="meta px-1 py-5">{{ ws ? 'Nothing has changed in this work space since its last commit, so there is nothing new to test.' : 'There are no tables yet.' }}</p>
     </div>
 
-    <!-- Nothing unsaved: the saved version is what lands, so its own tests are the ones that count. -->
+    <!-- Nothing uncommitted: the last commit is what is merged, so its own tests are the ones that count. -->
     <template v-if="savedReport">
       <!-- Failing: one notice — the problem, the failing rows, and the way back. -->
       <div v-if="!savedReport.passed" class="notice notice-needs mt-7 grid max-w-[980px] gap-3">
-        <p class="font-semibold">The saved version “{{ space.info?.lastMessage }}” fails its tests, so it cannot land.</p>
-        <TestReport plain :report="savedReport" rev="your saved version" :link-to="(d) => spacePath(ws, `/table/${d}`)" />
-        <p class="text-sm">Open the table, fix the marked rows, save, and save a version again.</p>
+        <p class="font-semibold">The commit “{{ space.info?.lastMessage }}” fails its tests, so it cannot be merged.</p>
+        <TestReport plain :report="savedReport" rev="your last commit" :link-to="(d) => spacePath(ws, `/table/${d}`)" />
+        <p class="text-sm">Open the table, fix the marked rows, save, and commit your changes again.</p>
       </div>
-      <TestReport v-else class="mt-7" :report="savedReport" rev="your saved version" :link-to="(d) => spacePath(ws, `/table/${d}`)" />
+      <TestReport v-else class="mt-7" :report="savedReport" rev="your last commit" :link-to="(d) => spacePath(ws, `/table/${d}`)" />
     </template>
   </div>
 </template>
@@ -46,6 +46,8 @@ import { useRoute, useRouter } from 'vue-router';
 import TestReport from '../components/TestReport.vue';
 import { api } from '../lib/api';
 import { useBar } from '../lib/bar';
+import { useAssistant } from '../lib/assistant';
+import { activity } from '../lib/progress';
 import { space } from '../lib/space';
 import { app, spaceIdFromRoute, spacePath } from '../store';
 
@@ -61,7 +63,7 @@ const verdicts = computed(() => app.verdictsFor(ws));
 const allPass = computed(() => targets.value.length > 0 && targets.value.every((t) => verdicts.value[t]?.passed));
 const scopeText = computed(() => (ws ? 'what you changed' : 'every table'));
 const intro = computed(() => (ws
-  ? 'Each changed table is run against its own test cases. A version can be saved with failing tests, but it cannot land until they pass.'
+  ? 'Each changed table is run against its own test cases. Changes can be committed with failing tests, but they cannot be merged until the tests pass.'
   : 'Each table is run against its own test cases.'));
 
 const failuresOf = (t) => {
@@ -72,7 +74,7 @@ const failuresOf = (t) => {
 };
 const firstLine = (s) => String(s || '').split('\n')[0];
 
-// The saved version's own run, when nothing is unsaved (the server keeps it per commit).
+// The last commit's own run, when nothing is uncommitted (the server keeps it per commit).
 const savedReport = ref(null);
 onMounted(async () => {
   await space.open(ws);
@@ -84,6 +86,7 @@ onMounted(async () => {
 async function runAll() {
   if (busy.value) return;
   busy.value = true;
+  const done = activity();
   let failing = 0;
   try {
     for (const t of targets.value) {
@@ -103,11 +106,21 @@ async function runAll() {
   } finally {
     runningNow.value = null;
     busy.value = false;
+    done();
   }
   app.say(failing
     ? `${failing} of ${targets.value.length} ${targets.value.length === 1 ? 'table has' : 'tables have'} failing tests. Open a table to see the failing rows.`
     : `Every changed table passes its tests.`, failing ? 'needs' : 'clean');
 }
+
+useAssistant(() => ({
+  now: !Object.keys(verdicts.value).length ? 'The tests have not been run yet: press Run the tests.'
+    : Object.values(verdicts.value).every((v) => v.passed) ? 'Every changed table passes its tests: the next step is Review and commit changes.'
+      : 'Some tests fail: open the failing domain to fix it, then run the tests again. Changes can be committed, but not merged, while tests fail.',
+  results: Object.keys(verdicts.value).length
+    ? Object.entries(verdicts.value).map(([t, v]) => `${t}: ${v.error && !v.total ? `cannot run — ${v.error}` : v.passed ? `all ${v.total} pass` : `${v.failed} of ${v.total} fail — ${failuresOf(t).map((f) => `${f.name}: ${f.error || ''}`).join('; ')}`}`)
+    : 'not run yet'
+}));
 
 useBar(() => {
   const broken = savedReport.value?.domains.find((d) => d.failures.length || d.error);
@@ -117,7 +130,7 @@ useBar(() => {
   if (ws && allPass.value) {
     return {
       secondary: [{ label: 'Run again', run: runAll, disabled: busy.value }],
-      primary: { label: 'Review and save version', run: () => router.push(spacePath(ws, '/version')) }
+      primary: { label: 'Review and commit changes', run: () => router.push(spacePath(ws, '/version')) }
     };
   }
   return { primary: { label: busy.value ? `Running ${runningNow.value || ''}` : 'Run the tests', run: runAll, busy: busy.value, disabled: !targets.value.length } };

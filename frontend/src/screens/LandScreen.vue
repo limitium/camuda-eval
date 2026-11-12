@@ -1,19 +1,19 @@
 <template>
   <div class="page-body wide">
-    <h1>Land it</h1>
-    <p class="lede">Landing brings your saved version into {{ lineName(target, app.info.mainBranch) }} and carries it forward, so no newer release can be missing it. Every step is combined and tested first; it happens all at once or not at all.</p>
+    <h1>Merge it</h1>
+    <p class="lede">Merging takes your committed changes into {{ target }}{{ target === app.info.mainBranch ? '' : `, then into every newer release branch and ${app.info.mainBranch}` }}, so no newer release can be missing them. Every merge is computed and tested first; it happens all at once or not at all.</p>
 
-    <p v-if="space.changes.length" class="notice notice-needs mt-7">There are changes that are not in a saved version. Only saved versions land — <router-link :to="spacePath(ws, '/version')" class="font-semibold">save one first</router-link>.</p>
+    <p v-if="space.changes.length" class="notice notice-needs mt-7">There are changes that are not committed yet. Only committed changes are merged — <router-link :to="spacePath(ws, '/version')" class="font-semibold">commit them first</router-link>.</p>
     <p v-else-if="error" class="notice notice-needs mt-7">{{ error }}</p>
-    <p v-else-if="!result" class="loading mt-7">Combining your version with every line it lands in, and running every test…</p>
+    <p v-else-if="!result" class="loading mt-7">Merging your committed changes into every branch in turn, and running every test…</p>
 
     <template v-else>
-      <!-- What happens and the network side by side: both columns start on the same line. -->
-      <div class="mt-8 grid items-start gap-10" :class="result.hops.length ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)] max-[1200px]:grid-cols-1' : ''">
+      <!-- What happens and the graph side by side: both columns start on the same line. -->
+      <div class="mt-8 grid items-start gap-10" :class="result.hops.length ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @max-[1200px]:grid-cols-1' : ''">
       <div class="min-w-0">
-      <!-- The ride as a strip map: your work space, then each line it lands in or is carried into as a
-           station, joined by the route it is carried along, with the state of that step under it. -->
-      <ol v-if="result.hops.length" class="chain m-0 flex list-none flex-wrap items-start gap-y-4 p-0 max-md:flex-col" aria-label="Where it lands, in order">
+      <!-- The merges in order: your work space, then each branch it is merged into, joined by a bar in
+           that branch's colour, with the state of that step under it. -->
+      <ol v-if="result.hops.length" class="chain m-0 flex list-none flex-wrap items-start gap-y-4 p-0 max-md:flex-col" aria-label="Where it merges, in order">
         <li class="grid flex-none content-start gap-1">
           <span class="flex h-8 items-center gap-2">
             <span class="flex w-8 flex-none justify-center" aria-hidden="true">
@@ -21,7 +21,7 @@
             </span>
             <span class="font-semibold whitespace-nowrap">{{ space.info?.name || 'Your work space' }}</span>
           </span>
-          <span class="pl-10 text-xs text-ink-3">your saved version</span>
+          <span class="pl-10 text-xs text-ink-3">your committed changes</span>
         </li>
         <li
           v-for="(hop, i) in result.hops"
@@ -29,7 +29,7 @@
           class="flex min-w-0 items-start max-md:flex-col"
           :class="stepClass(hop)"
         >
-          <!-- the route into this station, in the colour of the line it is carried into -->
+          <!-- the bar into this branch, in its colour -->
           <span
             class="mx-3 mt-[14px] h-1 w-16 flex-none rounded-full max-md:mx-0 max-md:my-1 max-md:ml-[14px] max-md:h-6 max-md:w-1"
             :class="hop.provisional ? 'opacity-40' : ''"
@@ -51,43 +51,43 @@
 
       <p v-if="result.status === 'NOTHING_TO_LAND'" class="notice mt-7 first:mt-0">{{ result.message }}.</p>
       <template v-else-if="result.status === 'LANDED'">
-        <p class="notice notice-clean mt-7">Landed in {{ landedLines }}. Every test passed at every step.</p>
+        <p class="notice notice-clean mt-7">Merged into {{ landedLines }}. Every test passed at every step.</p>
         <div v-if="!removed" class="mt-3.5 max-w-[70ch] border-y border-rule py-3.5">
           <p><strong class="font-bold">Remove the work space {{ space.info?.name }}?</strong> Everything in it is in {{ landedLines }} now. Keep it only to go on working in it.</p>
         </div>
         <p v-else class="meta mt-3.5">The work space is removed. <router-link to="/releases" class="font-semibold text-ink">Make a release</router-link> when it should ship.</p>
       </template>
       <p v-else-if="result.status === 'MOVED'" class="notice notice-needs mt-7">{{ result.message }}</p>
-      <p v-else-if="result.status === 'CLEAN'" class="notice notice-clean mt-7">Nothing disagrees and every test passes{{ steps > 1 ? ' at every step' : '' }}. Landing moves {{ landedLines }}{{ steps > 1 ? ' together' : '' }}.</p>
+      <p v-else-if="result.status === 'CLEAN'" class="notice notice-clean mt-7">No conflicts, and every test passes{{ steps > 1 ? ' at every step' : '' }}. Merging moves {{ landedLines }}{{ steps > 1 ? ' together' : '' }}.</p>
 
       <!-- Failing: one notice — the problem in a sentence, the failing rows, and the way back. -->
       <div v-if="result.status === 'TESTS_FAILED'" class="notice notice-needs mt-7 grid gap-3">
         <template v-if="ownFailing.length && ownFailing.length === failingDomains.length">
-          <p class="font-semibold">Your saved version fails its own tests in {{ ownFailing.join(', ') }} — combining did not cause it, and it would fail the same way anywhere.</p>
-          <TestReport v-for="hop in failing" :key="hop.into" plain class="border-t border-[oklch(85%_0.06_25)] pt-3" :report="hop.tests" :rev="`${lineName(hop.into, app.info.mainBranch)} after combining`"
+          <p class="font-semibold">Your committed changes fail their own tests in {{ ownFailing.join(', ') }} — the merge did not cause it, and they would fail the same way anywhere.</p>
+          <TestReport v-for="hop in failing" :key="hop.into" plain class="border-t border-[oklch(85%_0.06_25)] pt-3" :report="hop.tests" :rev="`${hop.into} after the merge`"
                       :link-to="(d) => spacePath(ws, `/table/${d}`)" :notes="failureNotes" />
-          <p class="text-sm">Open {{ ownFailing[0] }}, fix the marked rows, save a version, and come back.</p>
+          <p class="text-sm">Open {{ ownFailing[0] }}, fix the marked rows, commit your changes, and come back.</p>
         </template>
         <template v-else>
-          <p class="font-semibold">It combines cleanly, but tests fail after combining, so it cannot land.</p>
-          <TestReport v-for="hop in failing" :key="hop.into" plain class="border-t border-[oklch(85%_0.06_25)] pt-3" :report="hop.tests" :rev="`${lineName(hop.into, app.info.mainBranch)} after combining`"
+          <p class="font-semibold">No conflicts, but tests fail after the merge, so it cannot be merged.</p>
+          <TestReport v-for="hop in failing" :key="hop.into" plain class="border-t border-[oklch(85%_0.06_25)] pt-3" :report="hop.tests" :rev="`${hop.into} after the merge`"
                       :link-to="(d) => spacePath(ws, `/table/${d}`)" :notes="failureNotes" />
-          <p class="text-sm">Fix it in your work space — the failing cases are above — save a version, and come back.</p>
+          <p class="text-sm">Fix it in your work space — the failing cases are above — commit your changes, and come back.</p>
         </template>
       </div>
 
       <p v-if="result.status === 'CONFLICTS'" class="mt-7">
-        <strong class="font-bold">{{ conflicts.length }} {{ conflicts.length === 1 ? 'thing needs' : 'things need' }} a decision</strong>
-        <span class="meta"> — {{ answered }} answered. Your answers are kept if a line moves meanwhile; only new questions will need you.</span>
+        <strong class="font-bold">{{ conflicts.length }} {{ conflicts.length === 1 ? 'conflict needs' : 'conflicts need' }} a decision</strong>
+        <span class="meta"> — {{ answered }} answered. Your answers are kept if a branch moves meanwhile; only new conflicts will need you.</span>
       </p>
       </div>
 
-      <!-- Where it goes: the work space, and each line it lands in or is carried into, as dashed steps. -->
-      <div v-if="result.hops.length" ref="graphSide" class="sticky grid min-w-0 gap-2.5 max-[1200px]:static" :style="{ top: `${stickTop}px` }">
+      <!-- Where it goes: the work space, and each branch it is merged into, as dashed steps. -->
+      <div v-if="result.hops.length" ref="graphSide" class="sticky grid min-w-0 gap-2.5 @max-[1200px]:static" :style="{ top: `${stickTop}px` }">
         <BranchGraph
           v-if="history"
           class="graph"
-          :caption="['LANDED', 'NOTHING_TO_LAND'].includes(result.status) ? 'Where it landed' : 'Where it will land'"
+          :caption="['LANDED', 'NOTHING_TO_LAND'].includes(result.status) ? 'Where it merged' : 'Where it will merge'"
           :history="history"
           :focus="ws"
           :ghost="['LANDED', 'NOTHING_TO_LAND'].includes(result.status) ? [] : ghost"
@@ -139,7 +139,7 @@ const graphSide = ref(null);
 const stickTop = useStickyFit(graphSide);
 const loadHistory = () => api.history(42).then((h) => { history.value = h; }).catch(() => {});
 
-// The chain, step by step: into the target line, then carried into each newer line and main.
+// The chain, step by step: into the target branch, then merged into each newer release branch and main.
 const ghost = computed(() => {
   const steps = [];
   let from = ws;
@@ -154,18 +154,18 @@ const ghostText = computed(() => {
   if (!hops.length || ['LANDED', 'NOTHING_TO_LAND'].includes(result.value.status)) return '';
   const names = hops.filter((h) => !h.already).map((h) => lineName(h.into, app.info.mainBranch));
   if (!names.length) return '';
-  return names.length === 1 ? `Lands in ${names[0]}` : `Lands in ${names[0]}, then carried into ${names.slice(1).join(' and ')}`;
+  return names.length === 1 ? `Merges into ${names[0]}` : `Merges into ${names[0]}, then into ${names.slice(1).join(' and ')}`;
 });
 const removed = ref(false);
 const removing = ref(false);
 
-// Landed: everything in the work space is in the lines now, so it is usually done with.
+// Merged: everything in the work space is on those branches now, so it is usually done with.
 async function removeSpace() {
   removing.value = true;
   try {
     await api.deleteSpace(ws);
     removed.value = true;
-    app.say(`Removed the work space ${space.info?.name || ''}; its work lives in the lines.`, 'plain');
+    app.say(`Removed the work space ${space.info?.name || ''}; its commits are in ${landedLines.value || 'the branches it was merged into'}.`, 'plain');
   } catch (e) {
     app.say(`The work space was not removed: ${e.message}`, 'needs');
   } finally {
@@ -193,13 +193,13 @@ const target = computed(() => space.info?.targetLine || app.info.mainBranch);
 const conflicts = computed(() => (result.value?.hops || []).flatMap((h) => h.conflicts));
 const answered = computed(() => conflicts.value.filter((c) => answers[c.id]).length);
 const failing = computed(() => (result.value?.hops || []).filter((h) => h.tests && !h.tests.passed));
-// Which failures the work space brings with it, and which only appear once combined.
+// Which failures the work space brings with it, and which only appear after the merge.
 const ownReport = ref(null);
 const failingDomains = computed(() => [...new Set(failing.value.flatMap((h) => h.tests.domains.filter((d) => d.failures.length || d.error).map((d) => d.domain)))]);
 const ownFailing = computed(() => (ownReport.value?.domains || []).filter((d) => (d.failures.length || d.error) && failingDomains.value.includes(d.domain)).map((d) => d.domain));
 const failureNotes = computed(() => Object.fromEntries(failingDomains.value.map((d) => [d, ownFailing.value.includes(d)
-  ? 'Fails in your saved version too: fix it in your work space.'
-  : 'Passes in your work space; fails only once combined — something on the line changed what it depends on.'])));
+  ? 'Fails in your committed changes too: fix it in your work space.'
+  : 'Passes in your work space; fails only after the merge — something on the branch changed what it depends on.'])));
 const steps = computed(() => (result.value?.hops || []).filter((h) => !h.already).length);
 const landedLines = computed(() => (result.value?.hops || []).filter((h) => !h.already).map((h) => lineName(h.into, app.info.mainBranch)).join(', then '));
 
@@ -209,14 +209,14 @@ function stepClass(hop) {
   if (hop.tests && !hop.tests.passed) return 'needs';
   return hop.provisional ? 'waiting' : 'ready';
 }
-// The state word under each station; the detail of stepText goes beneath it.
+// The state word under each branch; the detail of stepText goes beneath it.
 const STATE = { done: 'state-quiet', needs: 'state-needs', waiting: 'state-quiet', ready: 'state-clean' };
 function stepWord(hop, i) {
   const k = stepClass(hop);
   if (k === 'done') return 'already has it';
   if (k === 'needs') return hop.conflicts.length ? 'needs you' : 'failing';
   if (k === 'waiting') return 'waiting';
-  if (result.value?.status === 'LANDED') return i === 0 ? 'landed' : 'carried here';
+  if (result.value?.status === 'LANDED') return 'merged';
   return 'ready';
 }
 const stepDetail = (hop, i) => (stepClass(hop) === 'done' || result.value?.status === 'LANDED' ? '' : stepText(hop, i));
@@ -225,9 +225,9 @@ function stepText(hop, i) {
   if (hop.conflicts.length) return `${hop.conflicts.length} to decide`;
   if (hop.provisional) return 'after the step before is decided';
   if (hop.tests && !hop.tests.passed) return `${hop.tests.failed} ${hop.tests.failed === 1 ? 'test fails' : 'tests fail'}`;
-  if (result.value?.status === 'LANDED') return i === 0 ? 'landed' : 'carried here';
+  if (result.value?.status === 'LANDED') return 'merged';
   const changed = hop.domains.filter((d) => d.change !== 'unchanged').length;
-  return `${i === 0 ? 'lands here' : 'carried here'} · ${changed} ${changed === 1 ? 'domain' : 'domains'} · ${hop.tests ? `${hop.tests.total} tests pass` : ''}`;
+  return `${i === 0 ? 'is merged here' : 'merged here'} · ${changed} ${changed === 1 ? 'domain' : 'domains'} · ${hop.tests ? `${hop.tests.total} tests pass` : ''}`;
 }
 
 function choose(id, key) {
@@ -250,7 +250,7 @@ async function compute(apply = false) {
       } catch {
         // nothing kept
       }
-      app.say(`Landed in ${landedLines.value}.`, 'clean');
+      app.say(`Merged into ${landedLines.value}.`, 'clean');
       space.open(ws);
       loadHistory();
     } else if (r.status === 'MOVED') {
@@ -294,7 +294,7 @@ useBar(() => {
     return { secondary: [...secondary, { label: 'Check again', run: () => compute(false), disabled: busy.value }], primary: { label: `Open ${d} to fix it`, run: () => router.push(spacePath(ws, `/table/${d}`)) } };
   }
   if (r.status === 'CLEAN') {
-    return { secondary, primary: { label: stale.value ? 'Check again' : `Land in ${r.hops.filter((h) => !h.already).length} ${r.hops.filter((h) => !h.already).length === 1 ? 'line' : 'lines'}`, run: () => compute(!stale.value), busy: busy.value } };
+    return { secondary, primary: { label: stale.value ? 'Check again' : `Merge into ${r.hops.filter((h) => !h.already).length} ${r.hops.filter((h) => !h.already).length === 1 ? 'branch' : 'branches'}`, run: () => compute(!stale.value), busy: busy.value } };
   }
   return { secondary, primary: { label: 'Check again', run: () => compute(false), busy: busy.value } };
 });

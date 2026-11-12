@@ -7,14 +7,15 @@
  * few hundred cells that is cheaper than keeping two representations in step.
  */
 
+// runs: false — the engine (Camunda 7) refuses it, so a table using one cannot be evaluated.
 const HIT_POLICIES = [
   { value: 'UNIQUE', label: 'Only one rule may match' },
   { value: 'FIRST', label: 'First matching rule wins' },
-  { value: 'PRIORITY', label: 'Highest-priority result wins' },
+  { value: 'PRIORITY', label: 'Highest-priority result wins', runs: false },
   { value: 'ANY', label: 'Any may match, all must agree' },
   { value: 'COLLECT', label: 'Collect every match' },
   { value: 'RULE ORDER', label: 'Every match, in rule order' },
-  { value: 'OUTPUT ORDER', label: 'Every match, by result priority' }
+  { value: 'OUTPUT ORDER', label: 'Every match, by result priority', runs: false }
 ];
 
 const AGGREGATIONS = [

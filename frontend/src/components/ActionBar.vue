@@ -1,7 +1,7 @@
 <template>
   <footer class="relative flex min-h-[var(--bar)] items-center justify-between gap-4 border-t border-rule bg-ground px-[var(--gutter)] py-2.5 max-md:flex-col max-md:items-stretch max-md:gap-2">
     <div class="relative min-w-0 flex-1" aria-live="polite">
-      <span v-if="bar.hint && last?.tone !== 'needs'" class="flex px-1.5 py-1 text-ink-2">{{ bar.hint }}</span>
+      <span v-if="bar.hint && last?.tone !== 'needs' && !fresh" class="flex px-1.5 py-1 text-ink-2">{{ bar.hint }}</span>
       <button
         v-else-if="last"
         type="button"
@@ -33,17 +33,17 @@
         type="button"
         class="btn"
         :class="{ 'btn-danger': action.danger, 'btn-quiet': action.quiet }"
-        :disabled="action.disabled || running === i"
-        :aria-busy="running === i ? 'true' : undefined"
-        @click="go(action, i)"
+        :disabled="action.disabled || bar.running === action"
+        :aria-busy="bar.running === action ? 'true' : undefined"
+        @click="bar.press(action)"
       >{{ action.label }}</button>
       <button
         v-if="bar.primary"
         type="button"
         class="btn btn-next"
-        :disabled="bar.primary.disabled || bar.primary.busy || running === 'primary'"
-        :aria-busy="bar.primary.busy || running === 'primary' ? 'true' : undefined"
-        @click="go(bar.primary, 'primary')"
+        :disabled="bar.primary.disabled || bar.primary.busy || bar.running === bar.primary"
+        :aria-busy="bar.primary.busy || bar.running === bar.primary ? 'true' : undefined"
+        @click="bar.press(bar.primary)"
       >
         {{ bar.primary.label }}
       </button>
@@ -52,24 +52,25 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { bar } from '../lib/bar';
 import { app } from '../store';
 
 const open = ref(false);
 const last = computed(() => app.last());
+// What just happened stays in view for a while even when the screen's next state has a hint: a tag
+// or a deploy confirmed only until the next render is not confirmed at all.
+const FRESH_MS = 8000;
+const fresh = ref(false);
+let freshTimer = null;
+watch(last, (entry) => {
+  clearTimeout(freshTimer);
+  const age = entry ? Date.now() - entry.at : Infinity;
+  fresh.value = age < FRESH_MS;
+  if (fresh.value) freshTimer = setTimeout(() => { fresh.value = false; }, FRESH_MS - age);
+}, { immediate: true });
+onBeforeUnmount(() => clearTimeout(freshTimer));
 const time = (at) => at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 const dotOf = (tone) => ({ clean: 'bg-clean', needs: 'bg-needs', live: 'bg-live' }[tone] || 'bg-rule-strong');
 
-// An action is busy for as long as what it started is running, whatever screen it came from.
-const running = ref(null);
-async function go(action, key) {
-  if (running.value !== null) return;
-  running.value = key;
-  try {
-    await action.run();
-  } finally {
-    running.value = null;
-  }
-}
 </script>

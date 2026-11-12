@@ -8,11 +8,11 @@
     <section v-else-if="merge" class="merge">
       <header class="max-w-[80ch]">
         <h1 class="text-xl">{{ merge.kind === 'dmn' ? `${file} was saved by someone else while you worked` : `The test cases for ${file} were saved by someone else while you worked` }}</h1>
-        <p class="lede">Nothing was overwritten, and your edits are all still here. Everything you changed in different places is combined. Where you both changed the same thing, pick which one stays.</p>
+        <p class="lede">Nothing was overwritten, and your edits are all still here. Everything you changed in different places is merged. Where you both changed the same thing, it is a conflict: pick which one stays.</p>
       </header>
-      <div class="mt-7 grid grid-cols-[minmax(300px,380px)_minmax(0,1fr)] items-start gap-8 max-[900px]:grid-cols-1">
+      <div class="mt-7 grid grid-cols-[minmax(300px,380px)_minmax(0,1fr)] items-start gap-8 @max-[900px]:grid-cols-1">
         <ConflictList
-          class="merge-list sticky top-0 max-[900px]:static"
+          class="merge-list sticky top-0 @max-[900px]:static"
           :conflicts="merge.conflicts"
           :resolutions="merge.resolutions"
           :focused="merge.focused"
@@ -82,7 +82,8 @@
         :decisions="decisions"
         :blocks="blocks"
         :saved-blocks="savedBlocks"
-        :results="verdict?.tests || null"
+        :results="lastRun?.tests || null"
+        :stale="!!lastRun?.stale"
         :problems="problems"
         @edit-tests="editTests"
       />
@@ -100,14 +101,16 @@
           <div v-if="decision.tabular" class="flex items-center gap-2">
             <label class="meta" :for="`hp-${decision.id}`">When several rules match</label>
             <select :id="`hp-${decision.id}`" class="field h-8 w-auto" :value="decision.hitPolicy" @change="edit(() => doc.setHitPolicy(decision.id, $event.target.value, decision.aggregation))">
-              <option v-for="p in HIT_POLICIES" :key="p.value" :value="p.value">{{ p.label }}</option>
+              <option v-for="p in HIT_POLICIES.filter((p) => p.runs !== false || p.value === decision.hitPolicy)" :key="p.value" :value="p.value">{{ p.runs === false ? `${p.label} (not run by this engine)` : p.label }}</option>
             </select>
             <select v-if="decision.hitPolicy === 'COLLECT'" class="field h-8 w-auto" :value="decision.aggregation" aria-label="How collected results are combined" @change="edit(() => doc.setHitPolicy(decision.id, 'COLLECT', $event.target.value))">
               <option v-for="a in AGGREGATIONS" :key="a.value" :value="a.value">{{ a.label }}</option>
             </select>
           </div>
-          <div class="ml-auto flex items-center gap-2.5 max-[900px]:ml-0">
+          <div class="ml-auto flex items-center gap-2.5 @max-[900px]:ml-0">
             <span v-if="decision.requires.length" class="meta">Uses {{ decision.requires.map(nameOf).join(', ') }}</span>
+            <button v-if="decision.tabular" type="button" class="btn btn-small" aria-haspopup="dialog" @click="syntaxOpen = true"><BookOpen aria-hidden="true" /> DMN syntax</button>
+            <button v-if="ws && app.info.gitEnabled" type="button" class="btn btn-small" :aria-pressed="historyOpen" aria-controls="history-title" @click="toggleHistory"><History aria-hidden="true" /> History</button>
             <template v-if="confirmRemove === decision.id">
               <span class="meta">Remove {{ decision.name }}?</span>
               <button type="button" class="btn btn-small btn-danger" @click="removeDecision(decision.id)">Remove</button>
@@ -121,8 +124,9 @@
 
         <p v-if="!decision.tabular" class="notice">{{ decision.name }} is a single expression, not a table, so it is not edited here. Its result is still shown in how the tables connect.</p>
 
+        <!-- With the history open, it sits beside the grid; a cell picked in the grid is offered to it, not read. -->
+        <div v-else :class="historyOpen ? 'grid grid-cols-[minmax(0,1fr)_minmax(300px,400px)] items-start gap-5 @max-[1180px]:grid-cols-1' : 'contents'">
         <RuleGrid
-          v-else
           :decision="decision"
           :fed-by="fedBy"
           :feeds="feeds"
@@ -130,6 +134,8 @@
           :column-states="edits.columns"
           :row-states="rowMarks"
           :sources="sourcesFor(decision.id)"
+          :selected="historyOpen ? historyTarget : null"
+          @select="onPick"
           @cell="(r, side, c, v) => edit(() => doc.setCell(decision.id, r, side, c, v))"
           @description="(r, v) => edit(() => doc.setDescription(decision.id, r, v))"
           @add-rule="(after) => edit(() => doc.addRule(decision.id, after))"
@@ -139,6 +145,19 @@
           @add-column="(side) => edit(() => (side === 'in' ? doc.addInput(decision.id, { expression: nextName('input'), typeRef: 'string' }) : doc.addOutput(decision.id, { name: nextName('result'), typeRef: 'string' })))"
           @remove-column="(side, i) => edit(() => doc.removeColumn(decision.id, side, i), 'Removed the column. Its cells in every rule went with it.')"
         />
+        <HistoryPanel
+          v-if="historyOpen"
+          class="sticky top-4 max-h-[calc(100vh-150px)] overflow-auto @max-[1180px]:static @max-[1180px]:max-h-none"
+          :domain="file"
+          :ws="ws"
+          :decision="decision"
+          :selection="pick"
+          :unsaved="historyUnsaved"
+          :reload-key="historyReload"
+          @target="(t) => (historyTarget = t)"
+          @close="historyOpen = false"
+        />
+        </div>
 
         <EvaluatePanel
           v-if="decision.tabular"
@@ -156,31 +175,37 @@
           :decisions="decisions"
           :blocks="blocks"
           :saved-blocks="savedBlocks"
-          :results="verdict?.tests || null"
+          :results="lastRun?.tests || null"
+        :stale="!!lastRun?.stale"
           :problems="problems"
           :ends="[decision.id]"
           @edit-tests="editTests"
         />
       </section>
     </template>
+
+    <SyntaxSheet v-if="syntaxOpen" :decision="decision" @close="syntaxOpen = false" />
   </div>
 </template>
 
 <script setup>
-import { computed, markRaw, onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue';
+import { computed, markRaw, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Plus, Workflow } from 'lucide-vue-next';
+import { BookOpen, History, Plus, Workflow } from 'lucide-vue-next';
 import ConflictList from '../components/ConflictList.vue';
 import EvaluatePanel from '../components/EvaluatePanel.vue';
+import HistoryPanel from '../components/HistoryPanel.vue';
 import TestSets from '../components/TestSets.vue';
 import RelationsView from '../components/RelationsView.vue';
 import RuleGrid from '../components/RuleGrid.vue';
+import SyntaxSheet from '../components/SyntaxSheet.vue';
 import { api } from '../lib/api';
 import { useBar } from '../lib/bar';
 import { AGGREGATIONS, DmnDocument, HIT_POLICIES, chainEnds, chainNoteFor, chainOutputsOf, editStates, relationsOf } from '../lib/dmnModel';
 import { space } from '../lib/space';
-import { blockFor, isExpectation, mergeSpecs, parseSpec, serializeSpec, SCENARIO, testEdits } from '../lib/testSpec';
-import { expectationColumn } from '../lib/testSpec';
+import { blockFor, isExpectation, mergeSpecs, parseSpec, serializeSpec, SCENARIO, testEdits, toCellText } from '../lib/testSpec';
+import { expectationColumn, expectationName } from '../lib/testSpec';
+import { useAssistant } from '../lib/assistant';
 import { app, spaceIdFromRoute, spacePath } from '../store';
 
 // Unsaved edits survive leaving the screen: a draft is never thrown away by navigation.
@@ -201,6 +226,7 @@ const testsDirty = ref(false);
 const loaded = ref(false);
 const loadError = ref(null);
 const tab = ref(null);
+const syntaxOpen = ref(false);
 const hints = ref([]);
 const problems = ref([]);
 const saving = ref(false);
@@ -210,6 +236,42 @@ const confirmRemove = ref(null);
 
 const dirty = computed(() => dmnDirty.value || testsDirty.value);
 const answer = ref(null);
+
+// --- history: of the domain, a table, a rule, a column or one cell ---------------------------------
+// Opened only on request. Picking a cell (to edit it) only offers it to the panel: the panel reads
+// what it is asked for — a level pressed there, or the offered cell — and what it shows is outlined.
+const historyOpen = ref(false);
+const historyTarget = ref(null);
+const pick = ref(null);
+const historyReload = ref(0);
+function toggleHistory() {
+  historyOpen.value = !historyOpen.value;
+}
+function onPick(ruleId, columnId) {
+  pick.value = { ruleId, columnId };
+}
+watch(tab, () => { pick.value = null; });
+// Edits not saved are not history yet: said when what is followed has some.
+const historyUnsaved = computed(() => {
+  const d = decision.value;
+  const e = edits.value;
+  const r = historyTarget.value?.ruleId;
+  const c = historyTarget.value?.columnId;
+  const later = 'They join the history once saved.';
+  switch (historyTarget.value?.level) {
+    case 'CELL':
+      return r && c && e.cells[`${r}|${c}`] ? `This cell has a change not saved yet, shown in blue. ${later}` : null;
+    case 'RULE':
+      if (r && e.rows[r] === 'new') return 'This rule is new and not saved yet, so it has no history.';
+      return r && Object.keys(e.cells).some((k) => k.startsWith(`${r}|`)) ? `This rule has changes not saved yet, shown in blue. ${later}` : null;
+    case 'COLUMN':
+      return c && (e.columns[c] || Object.keys(e.cells).some((k) => k.endsWith(`|${c}`))) ? `This column has changes not saved yet, shown in blue. ${later}` : null;
+    case 'TABLE':
+      return d && tabEdited(d) ? `This table has changes not saved yet, shown in blue. ${later}` : null;
+    default:
+      return dirty.value ? `${file} has changes not saved yet. ${later}` : null;
+  }
+});
 
 // Everything changed since the last save, in blue: compared rule by rule against what is stored.
 const savedDecisions = computed(() => {
@@ -230,6 +292,11 @@ const rowMarks = computed(() => {
 const decision = computed(() => decisions.value.find((d) => d.id === tab.value) || null);
 const relations = computed(() => relationsOf(decisions.value));
 const verdict = computed(() => app.verdictsFor(ws)[file] || null);
+// The last run's results stay on screen after an edit, marked as from before it, until the next run;
+// the verdict itself is dropped, so nothing counts as tested until it is run again.
+const lastRun = ref(null);
+watch(verdict, (v) => { if (v) lastRun.value = { tests: v.tests, stale: false }; }, { immediate: true });
+const markStale = () => { if (lastRun.value) lastRun.value = { ...lastRun.value, stale: true }; };
 // Results of the file's other tables, offered when choosing what a condition checks. Tables that use
 // this one are left out: checking their result would make a loop.
 const sourcesFor = (id) => {
@@ -314,6 +381,7 @@ function edit(change, note) {
   }
   dmnDirty.value = true;
   app.forgetVerdict(ws, file); // what was tested is no longer what is here
+  markStale();
   const synced = doc.value.syncRequirements();
   reread();
   if (note) app.say(note);
@@ -420,6 +488,7 @@ function editTests(change) {
   change();
   testsDirty.value = true;
   app.forgetVerdict(ws, file); // what was tested is no longer what is here
+  markStale();
 }
 
 function nextName(prefix) {
@@ -540,7 +609,8 @@ async function save() {
     }
     // A green result stays green when what was saved is exactly what was tested.
     if (verdict.value?.content !== savingContent) app.forgetVerdict(ws, file);
-    app.say(`Saved ${done.join(' and ')} for ${file}.${ws ? ' Only you can see this until you save a version.' : ''}`, 'clean');
+    app.say(`Saved ${done.join(' and ')} for ${file}.${ws ? ' Only you can see this until you commit your changes.' : ''}`, 'clean');
+    historyReload.value++;
     refreshChecks();
     if (ws) space.refresh();
   } catch (error) {
@@ -557,7 +627,7 @@ async function beginDmnMerge(oursXml) {
     doc.value = markRaw(new DmnDocument(result.mergedXml));
     base.dmn = theirs;
     reread();
-    app.say(`Someone else saved ${file} while you worked. You changed different things, so both are kept — save once more to store the combination.`, 'live');
+    app.say(`Someone else saved ${file} while you worked. You changed different things, so both are merged — save once more to store the merged result.`, 'live');
     return;
   }
   merge.value = { kind: 'dmn', conflicts: result.conflicts, resolutions: {}, focused: result.conflicts[0]?.id || null, theirs, ours: oursXml };
@@ -591,7 +661,7 @@ async function finishMerge() {
     // Kinds whose answers the server cannot apply yet come back unresolved; say which, keep everything.
     const open = result.conflicts.filter((c) => m.resolutions[c.id]);
     app.say(open.length
-      ? `${open.length} of these answers can’t be combined automatically yet (${[...new Set(open.map((c) => c.kind.toLowerCase().replace(/_/g, ' ')))].join(', ')}). Nothing was saved; ask the colleague and re-apply one side by hand.`
+      ? `${open.length} of these answers can’t be merged automatically yet (${[...new Set(open.map((c) => c.kind.toLowerCase().replace(/_/g, ' ')))].join(', ')}). Nothing was saved; ask the colleague and re-apply one side by hand.`
       : 'New conflicts appeared — someone saved again. Answer the new ones.', 'needs');
     merge.value = { ...m, conflicts: result.conflicts, resolutions: Object.fromEntries(Object.entries(m.resolutions).filter(([id]) => result.conflicts.some((c) => c.id === id))) };
     return;
@@ -656,7 +726,7 @@ useBar(() => {
   if (merge.value) {
     const open = merge.value.conflicts.filter((c) => !merge.value.resolutions[c.id]).length;
     return {
-      primary: { label: open ? `${open} still to answer` : 'Combine and save', run: finishMerge, disabled: open > 0 }
+      primary: { label: open ? `${open} still to answer` : 'Merge and save', run: finishMerge, disabled: open > 0 }
     };
   }
   if (dirty.value) {
@@ -666,9 +736,10 @@ useBar(() => {
       primary: { label: 'Save', run: save, busy: saving.value }
     };
   }
-  // A table untouched since the last version is not the next thing to do; the work space's step is.
+  // A table untouched since the last commit is not the next thing to do; the work space's step is.
   const untouched = ws && !space.changeOf(file) && !verdict.value;
-  if (untouched && ['try', 'land'].includes(space.current)) {
+  // Merged and kept, there is nothing to merge: no step to send it on to.
+  if (untouched && ['try', 'land'].includes(space.current) && !space.info?.saved?.landed) {
     const step = space.steps.find((s) => s.key === space.current);
     return {
       secondary: [back, { label: 'Run the tests', run: runTests, disabled: running.value }],
@@ -679,7 +750,7 @@ useBar(() => {
     return { secondary: [back], primary: { label: verdict.value ? 'Run the tests again' : 'Run the tests', run: runTests, busy: running.value } };
   }
   if (ws && space.current === 'version') {
-    return { secondary: [back], primary: { label: 'Review and save version', run: () => router.push(spacePath(ws, '/version')) } };
+    return { secondary: [back], primary: { label: 'Review and commit changes', run: () => router.push(spacePath(ws, '/version')) } };
   }
   if (ws && space.current === 'test') {
     return { secondary: [back], primary: { label: 'Test the other changed tables', run: () => router.push(spacePath(ws, '/test')) } };
@@ -721,6 +792,113 @@ onBeforeUnmount(() => {
     app.say(`Your edits to ${file} are not saved yet. They are kept here until you come back and save.`, 'live');
   }
 });
+// --- the assistant ---------------------------------------------------------------------------------
+// What it is told: every table of the domain as on screen (saved or not), with its test cases; and
+// the two things it may add, each through the same edits as a hand edit — one rule, or one case.
+const simpleName = (e) => /^[A-Za-z_][\w.]*$/.test(String(e || '').trim());
+useAssistant(() => {
+  if (!doc.value) return { domain: file };
+  const runs = lastRun.value?.tests || [];
+  return {
+    now: `${tab.value === 'relations' ? `The overview of how ${file}’s tables connect is open` : `The table “${decision.value?.name}” of ${file} is open`}; ${dirty.value ? `${changeLine.value} (shown in blue)` : 'nothing is unsaved'}.`,
+    domain: file,
+    tabOpen: tab.value === 'relations' ? 'How they connect' : decision.value?.name || null,
+    openTable: tab.value === 'relations' ? null : tab.value,
+    unsavedChanges: dirty.value ? changeLine.value : 'none',
+    tables: decisions.value.map((d) => {
+      const b = blocks.value.find((x) => x.decision === d.id) || blocks.value.find((x) => x.decision === d.name);
+      // A result names its case, not its table: this table's results are its own cases'.
+      const names = new Set(b ? b.rows.map((row) => row[b.columns.indexOf(SCENARIO)]) : []);
+      const mine = runs.filter((t) => names.has(t.name));
+      const failing = mine.filter((t) => !t.passed);
+      const from = {};
+      for (const l of relations.value.links) if (l.to === d.id) for (const v of l.via) from[v] = nameOf(l.from);
+      return {
+        id: d.id,
+        name: d.name,
+        open: d.id === tab.value,
+        tabular: d.tabular,
+        hitPolicy: d.hitPolicy,
+        aggregation: d.aggregation,
+        inputs: d.inputs.map((i) => ({ key: simpleName(i.expression) ? i.expression.trim() : i.label || i.expression, label: i.label, expression: i.expression, type: i.typeRef, from: from[i.expression.trim()] || '' })),
+        outputs: d.outputs.map((o) => ({ name: o.name, label: o.label, type: o.typeRef })),
+        rules: d.rules.map((r) => ({ inputs: r.inputs, outputs: r.outputs, description: r.description })),
+        uses: d.requires.map(nameOf),
+        supplied: hintFor(d.id)?.suppliedVariables || d.inputs.map((i) => i.expression),
+        tests: b ? { columns: b.columns, rows: b.rows } : null,
+        results: mine.length ? `${mine.length - failing.length} of ${mine.length} cases pass${lastRun.value?.stale ? ' (run before the last edit)' : ''}${failing.length ? `; failing: ${failing.map((t) => `${t.name || t.testName}: ${t.error || t.errorMessage || ''}`).join('; ')}` : ''}` : null,
+        problems: problemsFor(d.id).map((p) => p.message)
+      };
+    }),
+    xml: doc.value.serialize()
+  };
+}, {
+  add_rule(p) {
+    const d = decisions.value.find((x) => x.id === p.table);
+    if (!d) throw new Error(`${p.tableName} is no longer in ${file}: nothing was added.`);
+    if (d.inputs.length !== p.inputs.length || d.outputs.length !== p.outputs.length) {
+      throw new Error(`${d.name}’s columns changed since the rule was proposed: nothing was added. Ask again.`);
+    }
+    const at = Math.max(1, Math.min(d.rules.length + 1, p.position)) - 1;
+    edit(() => {
+      doc.value.addRule(d.id, at - 1);
+      p.inputs.forEach((v, c) => doc.value.setCell(d.id, at, 'in', c, v));
+      p.outputs.forEach((v, c) => doc.value.setCell(d.id, at, 'out', c, v));
+      if (p.description) doc.value.setDescription(d.id, at, p.description);
+    }, `Added rule ${at + 1} to ${d.name}, as the assistant proposed. It is not saved yet.`);
+    tab.value = d.id;
+  },
+  add_test(p) {
+    const d = decisions.value.find((x) => x.id === p.table);
+    if (!d) throw new Error(`${p.tableName} is no longer in ${file}: nothing was added.`);
+    editTests(() => {
+      let b = blocks.value.find((x) => x.decision === d.id) || blocks.value.find((x) => x.decision === d.name);
+      if (!b) {
+        const hint = hintFor(d.id) || { suppliedVariables: d.inputs.map((i) => i.expression), outputs: d.outputs.map((o) => o.name) };
+        b = { ...blockFor({ ...hint, decision: d.id }), rows: [] };
+        blocks.value.push(b);
+      }
+      // A value or a result the set has no column for gets one, where a hand-added column would go.
+      for (const name of Object.keys(p.given)) {
+        if (b.columns.includes(name)) continue;
+        const first = b.columns.findIndex((c) => isExpectation(c));
+        const at = first < 0 ? b.columns.length : first;
+        b.columns.splice(at, 0, name);
+        b.rows.forEach((row) => row.splice(at, 0, ''));
+      }
+      for (const name of Object.keys(p.expect)) {
+        if (b.columns.includes(expectationColumn(name))) continue;
+        b.columns.push(expectationColumn(name));
+        b.rows.forEach((row) => row.push(''));
+      }
+      b.rows.push(b.columns.map((c) => (c === SCENARIO ? p.scenario
+        : isExpectation(c) ? toCellText(p.expect[expectationName(c)])
+          : toCellText(p.given[c]))));
+    });
+    app.say(`Added the test case “${p.scenario}” to ${d.name}, as the assistant proposed. It is not saved yet.`);
+    tab.value = d.id;
+  },
+  change_cell(p) {
+    const d = decisions.value.find((x) => x.id === p.table);
+    const rule = d?.rules[p.rule - 1];
+    if (!rule) throw new Error(`${p.tableName} has no rule ${p.rule} any more: nothing was changed.`);
+    // The cell must still be what the card showed; otherwise the person is confirming something else.
+    const now = (p.side === 'in' ? rule.inputs : rule.outputs)[p.index] ?? '';
+    if (now.trim() !== String(p.before).trim()) throw new Error(`rule ${p.rule}’s ${p.column} changed since it was proposed: nothing was changed. Ask again.`);
+    edit(() => doc.value.setCell(d.id, p.rule - 1, p.side, p.index, p.value), `Changed rule ${p.rule} of ${d.name}: ${p.column} is ${p.value} now, as the assistant proposed. It is not saved yet.`);
+    tab.value = d.id;
+  },
+  remove_rule(p) {
+    const d = decisions.value.find((x) => x.id === p.table);
+    const rule = d?.rules[p.rule - 1];
+    if (!rule || JSON.stringify(rule.inputs) !== JSON.stringify(p.inputs) || JSON.stringify(rule.outputs) !== JSON.stringify(p.outputs)) {
+      throw new Error(`rule ${p.rule} of ${p.tableName} is not the rule that was proposed for removal any more: nothing was removed. Ask again.`);
+    }
+    edit(() => doc.value.removeRule(d.id, p.rule - 1), `Removed rule ${p.rule} from ${d.name}, as the assistant proposed. It is not saved yet.`);
+    tab.value = d.id;
+  }
+});
+
 // --- the tabs --------------------------------------------------------------------------------------
 const tabFlagged = (d) => problemsFor(d.id).some((p) => p.severity === 'ERROR');
 const tabClass = (active, extra = {}) => [

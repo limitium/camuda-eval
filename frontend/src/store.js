@@ -86,18 +86,18 @@ export function whenText(iso) {
 }
 
 /**
- * A work space's state on this instance, against its one saved version (the branch): saved, unsaved
- * changes here, or behind a version saved elsewhere. Returns { key, text, tone }.
+ * A work space's state on this instance, against its commits (the branch): committed, uncommitted
+ * changes here, or behind a commit made elsewhere. Returns { key, text, tone }.
  */
 export function savedStateOf(space) {
   const s = space?.saved;
-  if (!s) return space?.dirty ? { key: 'UNSAVED', text: 'Unsaved changes here', tone: 'needs' } : { key: 'SAVED', text: 'Saved', tone: 'quiet' };
+  if (!s) return space?.dirty ? { key: 'UNSAVED', text: 'Uncommitted changes here', tone: 'needs' } : { key: 'SAVED', text: 'Committed', tone: 'quiet' };
   const where = `${s.savedBy || 'someone'}${s.savedOn ? ` on ${s.savedOn}` : ''}`;
   switch (s.state) {
-    case 'BEHIND': return { key: s.state, text: `Newer version saved by ${where} — refresh`, tone: 'live' };
-    case 'BEHIND_UNSAVED': return { key: s.state, text: `Unsaved changes here, and a newer version saved by ${where}`, tone: 'needs' };
-    case 'UNSAVED': return { key: s.state, text: 'Unsaved changes here', tone: 'needs' };
-    default: return { key: 'SAVED', text: `Saved${s.savedOn ? ` (last on ${s.savedOn})` : ''}`, tone: 'quiet' };
+    case 'BEHIND': return { key: s.state, text: `Newer commit by ${where} — pull`, tone: 'live' };
+    case 'BEHIND_UNSAVED': return { key: s.state, text: `Uncommitted changes here, and a newer commit by ${where}`, tone: 'needs' };
+    case 'UNSAVED': return { key: s.state, text: 'Uncommitted changes here', tone: 'needs' };
+    default: return { key: 'SAVED', text: `Committed${s.savedOn ? ` (last on ${s.savedOn})` : ''}`, tone: 'quiet' };
   }
 }
 
@@ -105,12 +105,12 @@ export function savedStateOf(space) {
 export function purposeOf(space, mainBranch = 'main') {
   if (!space) return '';
   if (space.kind === 'hotfix' || space.kind === 'HOTFIX') {
-    return `Fixing ${space.baseline}, lands in ${lineName(space.targetLine, mainBranch)}`;
+    return `Fixing ${space.baseline}, merges into ${lineName(space.targetLine, mainBranch)}`;
   }
-  // Started from one commit: name it short, like a version, not by its whole hash.
+  // Started from one commit: name it short, like git does, not by its whole hash.
   const base = /^[0-9a-f]{40}$/.test(space.baseline || '') ? `commit ${space.baseline.slice(0, 7)}` : lineName(space.baseline, mainBranch);
   if (space.baseline === space.targetLine) return `Building on ${base}`;
-  return `Building on ${base}, lands in ${lineName(space.targetLine, mainBranch)}`;
+  return `Building on ${base}, merges into ${lineName(space.targetLine, mainBranch)}`;
 }
 
 /** Any wording as a branch name: lower case, words joined by dashes, nothing git would refuse. */
@@ -120,34 +120,38 @@ export function branchSlug(text) {
     .replace(/^[-.]+|[-.]+$/g, '').replace(/\.lock$/, '');
 }
 
-/** Any branch in words: a line, or a work space ("bob’s pricing"). */
-export function branchName(ref, mainBranch = 'main') {
-  const space = String(ref || '').match(/^(feature|hotfix)\/([\w.-]+)\/([\w.-]+)$/);
-  if (space) return `${space[2]}’s ${space[3]}`;
-  return lineName(ref, mainBranch);
-}
-
-export function lineName(ref, mainBranch = 'main') {
-  if (!ref) return '';
-  if (ref === mainBranch) return mainBranch;
-  if (ref.startsWith('release/')) return `release ${ref.slice('release/'.length)}`;
-  return ref;
+/** Any branch by its git name: main, release/1.0, feature/alice/pricing, hotfix/bob/x. */
+export function branchName(ref) {
+  return String(ref || '');
 }
 
 /**
- * A commit message in the analyst's words: landings and carries are said plainly, anything else is
- * left as its author wrote it.
+ * The branch a work space started from a picked commit merges into. A commit that is the newest of
+ * several branches (a release branch created at main's newest commit) starts on the last of them — the
+ * newest release branch; otherwise on the branch it was picked on. Null when that is not main or a
+ * release branch.
  */
-export function plainMessage(message, mainBranch = 'main') {
-  const text = String(message || '');
-  let m = text.match(/^Land (feature|hotfix)\/([\w.-]+)\/([\w.-]+)(?: into (\S+))?/);
-  if (m) return `${m[2]}’s ${m[1] === 'hotfix' ? 'fix' : 'change'} “${m[3]}” landed in ${lineName(m[4] || mainBranch, mainBranch)}`;
-  m = text.match(/^Bring (\S+) into (feature|hotfix)\/([\w.-]+)\/([\w.-]+)/);
-  if (m) return `${branchName(m[1], mainBranch)} brought into ${m[3]}’s “${m[4]}”`;
-  m = text.match(/^Carry (\S+) forward into (\S+)/);
-  if (m) {
-    const from = lineName(m[1], mainBranch);
-    return `${from.charAt(0).toUpperCase() + from.slice(1)} carried forward into ${lineName(m[2], mainBranch)}`;
-  }
-  return text;
+export function startLineOf(c, mainBranch = 'main') {
+  const number = (b) => [...b.slice('release/'.length).split('.').map(Number), 0];
+  const releases = (c?.tips || []).filter((t) => /^release\/\d+\.\d+(\.\d+)?$/.test(t))
+    .sort((a, b) => number(a)[0] - number(b)[0] || number(a)[1] - number(b)[1] || number(a)[2] - number(b)[2]);
+  if (releases.length) return releases[releases.length - 1];
+  return c?.lane === mainBranch || /^release\//.test(c?.lane || '') ? c.lane : null;
+}
+
+/** main or a release branch by its git name (release/1.0); kept apart from branchName for its callers. */
+export function lineName(ref) {
+  return String(ref || '');
+}
+
+/**
+ * A commit message as git has it. Only the older wordings of a merge are normalised, so history reads
+ * one way: "Land X into Y", "Carry X forward into Y" and "Bring X into Y" were all merges, and say
+ * "Merge X into Y" now, like every newer one. Anything else is left as its author wrote it.
+ */
+export function plainMessage(message) {
+  return String(message || '')
+    .replace(/^Land (?=(?:feature|hotfix)\/|\S+ into \S)/, 'Merge ')
+    .replace(/^Carry (\S+) forward into (\S+)/, 'Merge $1 into $2')
+    .replace(/^Bring (\S+) into (\S+)/, 'Merge $1 into $2');
 }

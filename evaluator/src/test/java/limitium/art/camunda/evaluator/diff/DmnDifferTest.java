@@ -124,6 +124,27 @@ class DmnDifferTest {
     }
 
     @Test
+    @DisplayName("a rule pushed down by one added above it has not moved: its order among the others is the same")
+    void insertAboveIsNotAMove() {
+        String left = table().hitPolicy("FIRST")
+                .rule("r1", "< 10", "\"LOW\"")
+                .rule("r2", ">= 10", "\"HIGH\"")
+                .xml();
+        String right = table().hitPolicy("FIRST")
+                .rule("r0", "< 0", "\"NONE\"")
+                .rule("r1", "< 10", "\"LOW\"")
+                .rule("r2", ">= 10", "\"HIGH\"")
+                .xml();
+
+        DmnDiff diff = DmnDiffer.diff(left, right);
+        assertEquals(1, diff.summary.rulesAdded);
+        assertEquals(0, diff.summary.rulesMoved);
+        assertEquals(ChangeType.ADDED, ruleAt(onlyDecision(diff), 0).change);
+        assertEquals(ChangeType.UNCHANGED, ruleAt(onlyDecision(diff), 1).change);
+        assertEquals(ChangeType.UNCHANGED, ruleAt(onlyDecision(diff), 2).change);
+    }
+
+    @Test
     void hitPolicyChangeIsReported() {
         String left = table().hitPolicy("UNIQUE").rule("r1", "< 10", "\"LOW\"").xml();
         String right = table().hitPolicy("FIRST").rule("r1", "< 10", "\"LOW\"").xml();

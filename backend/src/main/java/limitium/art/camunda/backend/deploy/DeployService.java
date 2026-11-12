@@ -236,17 +236,16 @@ public class DeployService {
     // --- deploying ---------------------------------------------------------------------------
 
     public Map<String, Object> deployRelease(String application, String version, String by) throws IOException {
-        if (version == null || !version.matches("v\\d+\\.\\d+\\.\\d+")) {
-            throw new Refused("NOT_A_VERSION", "only a released version can be deployed");
+        if (version == null || !limitium.art.camunda.backend.git.ReleaseNames.isTag(version)) {
+            throw new Refused("NOT_A_VERSION", "only a release tag can be deployed");
         }
         String commit = store.resolve("refs/tags/" + version);
         if (commit == null) {
-            throw new Refused("NO_SUCH_VERSION", "there is no version " + version);
+            throw new Refused("NO_SUCH_VERSION", "there is no tag " + version);
         }
-        String[] parts = version.substring(1).split("\\.");
         Envelope template = new Envelope();
         template.release = version;
-        template.line = "release/" + parts[0] + "." + parts[1];
+        template.line = store.releaseBranchOf(version);
         return deploy(find(application), commit, template, by);
     }
 
@@ -261,11 +260,11 @@ public class DeployService {
             throw new Refused("NO_SUCH_SPACE", "no such space");
         }
         if (space.dirty) {
-            throw new Refused("UNSAVED", "save a version first — only a saved version can run, so anyone can look it up");
+            throw new Refused("UNSAVED", "commit your changes first — only committed changes can run, so anyone can look them up");
         }
         String saved = store.sharedHead(id);
         if (saved == null || !saved.equals(space.head)) {
-            throw new Refused("NOT_SAVED", "this copy is not the space's saved version; refresh or save first");
+            throw new Refused("NOT_SAVED", "this copy is not the space's last commit; pull or commit first");
         }
         Envelope template = new Envelope();
         template.line = space.targetLine;
@@ -313,7 +312,7 @@ public class DeployService {
         }
         // What runs is a draft: only an instance that may publish drafts sends one again.
         if (!properties.isAllowDraftPublish()) {
-            throw new Refused("NOT_A_VERSION", d.name + " runs a draft, and this instance deploys only released versions; deploy one");
+            throw new Refused("NOT_A_VERSION", d.name + " runs a draft, and this instance deploys only release tags; deploy one");
         }
         Envelope template = new Envelope();
         template.release = (String) last.get("release");
@@ -395,7 +394,7 @@ public class DeployService {
             }
             if (!missing.isEmpty()) {
                 throw new Refused("MISSING_FILES", d.name + " reads " + String.join(", ", missing)
-                        + ", which this version does not have; nothing was deployed");
+                        + ", which this commit does not have; nothing was deployed");
             }
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("application", d.name);

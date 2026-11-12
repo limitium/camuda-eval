@@ -210,7 +210,7 @@ public class BranchCleanup {
             Map<ObjectId, List<String>> versionsAt = new LinkedHashMap<>();
             for (Ref ref : git.tagList().call()) {
                 String tag = ref.getName().substring(Constants.R_TAGS.length());
-                if (tag.matches("v\\d+\\.\\d+\\.\\d+")) {
+                if (ReleaseNames.isTag(tag)) {
                     ObjectId peeled = repository.getRefDatabase().peel(ref).getPeeledObjectId();
                     versionsAt.computeIfAbsent(peeled != null ? peeled : ref.getObjectId(), k -> new ArrayList<>()).add(tag);
                 }
@@ -335,10 +335,10 @@ public class BranchCleanup {
             RefUpdate.Result result = update.delete();
             if (result != RefUpdate.Result.FORCED && result != RefUpdate.Result.FAST_FORWARD
                     && result != RefUpdate.Result.NO_CHANGE) {
-                throw new IOException("could not close " + line + ": " + result);
+                throw new IOException("could not delete " + line + ": " + result);
             }
         }
-        // Closed here; closed on the remote too, or the next sync would bring it back.
+        // Deleted here; deleted on the remote too, or the next sync would bring it back.
         store.removeFromRemote(Constants.R_HEADS + line);
     }
 
@@ -419,12 +419,7 @@ public class BranchCleanup {
     }
 
     private static String lineKey(String ref) {
-        String[] parts = ref.substring(ref.lastIndexOf('/') + 1).split("\\.");
-        StringBuilder key = new StringBuilder();
-        for (String part : parts) {
-            key.append(String.format("%06d", part.matches("\\d+") ? Integer.parseInt(part) : 0));
-        }
-        return key.toString();
+        return ReleaseNames.branchKey(ref.startsWith(Constants.R_HEADS) ? ref.substring(Constants.R_HEADS.length()) : ref);
     }
 
 }

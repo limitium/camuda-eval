@@ -1,14 +1,14 @@
 <template>
-  <section class="grid gap-2" aria-label="Bring in changes">
-    <h2 class="text-sm font-bold text-ink-2">Bring in changes</h2>
-    <p class="max-w-[72ch] text-sm text-ink-2">Take what moved on a line, or a colleague’s work space from any instance, into this one. Pick it in the graph; anything both changed is asked, as when landing.</p>
-    <p v-if="!loaded" class="loading text-sm">Reading the lines and work spaces…</p>
+  <section class="grid gap-2" aria-label="Merge from another branch">
+    <h2 class="text-sm font-bold text-ink-2">Merge from another branch</h2>
+    <p class="max-w-[72ch] text-sm text-ink-2">Merge main, a release branch, or a colleague’s work space from any instance into this one. Pick it in the graph; anything both changed is a conflict you decide, as in any merge.</p>
+    <p v-if="!loaded" class="loading text-sm">Reading the branches and work spaces…</p>
     <div class="flex flex-wrap items-center gap-2">
       <select v-if="others.length" v-model="otherPick" class="field max-w-[460px]" aria-label="Another work space">
         <option value="">or another work space…</option>
-        <option v-for="s in others" :key="s.id" :value="s.id">{{ branchName(s.id, mainBranch) }}{{ s.savedOn ? ` (saved on ${s.savedOn})` : '' }}{{ s.lastMessage ? ` — “${s.lastMessage}”` : '' }}</option>
+        <option v-for="s in others" :key="s.id" :value="s.id">{{ s.id }}{{ s.savedOn ? ` (committed on ${s.savedOn})` : '' }}{{ s.lastMessage ? ` — “${s.lastMessage}”` : '' }}</option>
       </select>
-      <router-link v-if="from" class="btn" :to="spacePath(spaceId, `/pull?from=${encodeURIComponent(from)}`)"><LineBullet v-if="from === mainBranch || from.startsWith('release/')" :line="from" :main-branch="mainBranch" size="sm" />Bring {{ branchName(from, mainBranch) }} in</router-link>
+      <router-link v-if="from" class="btn" :to="spacePath(spaceId, `/pull?from=${encodeURIComponent(from)}`)"><LineBullet v-if="from === mainBranch || from.startsWith('release/')" :line="from" :main-branch="mainBranch" size="sm" />Merge from {{ from }}</router-link>
     </div>
   </section>
 </template>
@@ -17,10 +17,10 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import LineBullet from './LineBullet.vue';
 import { api } from '../lib/api';
-import { branchName, spacePath } from '../store';
+import { spacePath } from '../store';
 
 /*
- * The controls for choosing what to bring into a work space. The pick itself happens in the screen's
+ * The controls for choosing what to merge into a work space. The pick itself happens in the screen's
  * one graph: this says which branches can be picked ('pickable') and holds what was picked (v-model:from).
  */
 const props = defineProps({
@@ -45,7 +45,7 @@ onMounted(async () => {
     lines.value = l.filter((x) => !x.main).map((x) => x.branch);
     others.value = [...mine, ...elsewhere].filter((s) => s.id !== props.spaceId);
   } catch {
-    // nothing more to pick than the main line
+    // nothing more to pick than main
   } finally {
     loaded.value = true;
   }

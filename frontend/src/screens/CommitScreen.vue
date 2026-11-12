@@ -4,7 +4,7 @@
     <p v-else-if="!info" class="loading">Opening {{ sha.slice(0, 12) }}…</p>
 
     <template v-else>
-      <h1 class="text-xl">Version <span class="mono">{{ info.shortSha }}</span></h1>
+      <h1 class="text-xl">Commit <span class="mono">{{ info.shortSha }}</span></h1>
       <p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <span v-for="v in info.versions" :key="v" class="inline-flex items-center gap-1.5">
           <LineBullet v-if="lineOfTag(v)" :line="lineOfTag(v)" :main-branch="app.info.mainBranch" size="sm" :title="lineName(lineOfTag(v), app.info.mainBranch)" />
@@ -12,7 +12,7 @@
         </span>
         <span v-for="t in info.tips" :key="t" class="meta inline-flex items-center gap-1.5">
           <LineBullet v-if="isLine(t)" :line="t" :main-branch="app.info.mainBranch" size="sm" />
-          newest on {{ tipName(t) }}
+          newest on {{ t }}
         </span>
         <span v-if="runningIn.length" class="state state-live">runs in {{ runningIn.join(', ') }}</span>
       </p>
@@ -21,7 +21,7 @@
 
       <section class="mt-9 grid gap-2">
         <h2 class="text-sm font-bold text-ink-2">Domains</h2>
-        <p v-if="!info.domains.length" class="meta">This version holds no domain.</p>
+        <p v-if="!info.domains.length" class="meta">This commit holds no domain.</p>
         <div v-else class="rows max-w-[760px]">
           <router-link v-for="d in info.domains" :key="d" :to="`/commit/${info.sha}/${d}`" class="group flex min-h-12 items-center justify-between gap-3 px-1 py-3 no-underline hover:bg-hover">
             <span class="text-lg font-semibold">{{ d }}</span>
@@ -58,10 +58,9 @@ const report = ref(null);
 const testing = ref(false);
 const testError = ref(null);
 const runningIn = ref([]);
-const tipName = (branch) => (branch.split('/').length === 3 ? `${branch.split('/')[1]}’s space ${branch.split('/')[2]}` : lineName(branch, app.info.mainBranch));
 
-const isLine = (branch) => branch === app.info.mainBranch || /^release\/\d+\.\d+$/.test(branch);
-// release/M.m for a version vM.m.p.
+const isLine = (branch) => branch === app.info.mainBranch || /^release\/\d+\.\d+(\.\d+)?$/.test(branch);
+// release/M.m for a tag vM.m.p.
 const lineOfTag = (tag) => {
   const m = /^v(\d+)\.(\d+)/.exec(tag || '');
   return m ? `release/${m[1]}.${m[2]}` : null;
@@ -71,7 +70,7 @@ onMounted(async () => {
   try {
     info.value = await api.commit(sha);
   } catch (error) {
-    loadError.value = error.status === 404 ? `There is no version ${sha} here. If it was made on another instance, it arrives with the next exchange.` : error.message;
+    loadError.value = error.status === 404 ? `There is no commit ${sha} here. If it was made on another instance, it arrives with the next fetch.` : error.message;
     return;
   }
   api.applications().then((r) => {

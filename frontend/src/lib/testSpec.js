@@ -196,8 +196,10 @@ export function mergeSpecs(baseText, oursText, theirsText) {
 
 /**
  * What changed in one decision's test cases since they were stored, keyed for TestGrid: cells as
- * `${row}|${column}`, new cases by row, new columns by name. Cases are compared by position — they
- * have no identity of their own while being typed.
+ * `${row}|${column}`, new cases by row, new columns by name. Cases have no identity of their own while
+ * being typed, so unchanged ones are matched first, in order; what is left between two matches is
+ * paired in order as edited, and the rest is new or removed. A case copied, added or removed in the
+ * middle so marks only itself, not every case after it.
  */
 export function testEdits(saved, current) {
   const cells = {};
@@ -216,22 +218,60 @@ export function testEdits(saved, current) {
       count++;
     }
   });
-  current.rows.forEach((row, r) => {
-    if (r >= saved.rows.length) {
-      rows[r] = 'new';
-      count++;
-      return;
-    }
-    current.columns.forEach((col, c) => {
-      const i = saved.columns.indexOf(col);
-      if (i < 0) return;
-      if (String(saved.rows[r][i] ?? '').trim() !== String(row[c] ?? '').trim()) {
-        cells[`${r}|${c}`] = 'edited';
-        count++;
+  const shared = current.columns.filter((c) => saved.columns.includes(c));
+  const cellOf = (row, columns, col) => String(row[columns.indexOf(col)] ?? '').trim();
+  const keyOf = (row, columns) => shared.map((col) => cellOf(row, columns, col)).join('\u0000');
+  const was = saved.rows.map((row) => keyOf(row, saved.columns));
+  const now = current.rows.map((row) => keyOf(row, current.columns));
+  // Longest run of unchanged cases, in order.
+  const n = was.length;
+  const m = now.length;
+  const lcs = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) lcs[i][j] = was[i] === now[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+  }
+  const anchors = [];
+  for (let i = 0, j = 0; i < n && j < m;) {
+    if (was[i] === now[j]) anchors.push([i++, j++]);
+    else if (lcs[i + 1][j] >= lcs[i][j + 1]) i++;
+    else j++;
+  }
+  anchors.push([n, m]);
+  const alike = (before, row) => shared.filter((col) => cellOf(before, saved.columns, col) === cellOf(row, current.columns, col)).length;
+  // Between two matches, each case is paired, in order, with the stored case it has most in common with;
+  // one with nothing in common is new.
+  let removedRows = 0;
+  let fromSaved = 0;
+  let fromNow = 0;
+  for (const [i, j] of anchors) {
+    let next = fromSaved;
+    let paired = 0;
+    for (let r = fromNow; r < j; r++) {
+      let best = -1;
+      let most = 0;
+      for (let k = next; k < i; k++) {
+        const same = alike(saved.rows[k], current.rows[r]);
+        if (same > most) [best, most] = [k, same];
       }
-    });
-  });
-  const removedRows = Math.max(0, saved.rows.length - current.rows.length);
+      if (best < 0) {
+        rows[r] = 'new';
+        count++;
+        continue;
+      }
+      current.columns.forEach((col, c) => {
+        if (!saved.columns.includes(col)) return;
+        if (cellOf(saved.rows[best], saved.columns, col) !== cellOf(current.rows[r], current.columns, col)) {
+          cells[`${r}|${c}`] = 'edited';
+          count++;
+        }
+      });
+      next = best + 1;
+      paired++;
+    }
+    removedRows += i - fromSaved - paired;
+    fromSaved = i + 1;
+    fromNow = j + 1;
+  }
   const removedColumns = saved.columns.filter((c) => !current.columns.includes(c)).length;
   return { cells, rows, columns, count: count + removedRows + removedColumns, removedRows };
 }

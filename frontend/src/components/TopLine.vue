@@ -1,5 +1,5 @@
 <template>
-  <!-- The signage band: where you are, as a station sign would say it. -->
+  <!-- The top band: where you are. -->
   <header class="flex h-[var(--top)] items-center justify-between gap-4 bg-sign px-[var(--gutter)] text-sm text-white">
     <nav class="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] max-md:pr-6 max-md:[mask-image:linear-gradient(to_right,black_82%,transparent)]" aria-label="Where you are">
       <router-link to="/" class="mr-3 flex flex-none items-center gap-2 text-[15px] font-extrabold tracking-[-0.01em] no-underline max-md:mr-1" aria-label="Rules">
@@ -17,19 +17,31 @@
         class="flex-none whitespace-nowrap rounded-sm px-2.5 py-1.5 font-semibold no-underline transition-colors max-md:px-1.5"
         :class="zone === z.key ? 'bg-white text-brand' : 'text-white/85 hover:bg-white/15 hover:text-white'"
       >{{ z.label }}</router-link>
+      <!-- The work space and table as a trail, where there is room for them; narrower, the steps below
+           and the page's own heading say where you are, and squeezed they would read as "M > f". -->
       <template v-if="spaceLabel">
-        <span class="mx-2 h-4 w-px flex-none bg-white/35 max-md:hidden" aria-hidden="true"></span>
-        <router-link :to="spaceHome" class="flex min-w-0 items-center gap-2 no-underline hover:underline max-md:hidden">
-          <LineBullet v-if="space.info?.targetLine" :line="space.info.targetLine" :main-branch="app.info.mainBranch" size="sm" />
+        <span class="mx-2 h-4 w-px flex-none bg-white/35 max-lg:hidden" aria-hidden="true"></span>
+        <router-link :to="spaceHome" class="flex min-w-0 items-center gap-2 no-underline hover:underline max-lg:hidden">
+          <!-- Ringed: main's own colour is the bar's, and a bare disc would vanish into it. -->
+          <LineBullet v-if="space.info?.targetLine" :line="space.info.targetLine" :main-branch="app.info.mainBranch" size="sm" class="ring-[1.5px] ring-white/85" />
           <span class="truncate font-semibold">{{ spaceLabel }}</span>
         </router-link>
       </template>
       <template v-if="route.params.file">
-        <ChevronRight :size="14" class="flex-none text-white/60" aria-hidden="true" />
-        <span class="truncate font-mono text-[12px]">{{ route.params.file }}</span>
+        <ChevronRight :size="14" class="flex-none text-white/60 max-lg:hidden" aria-hidden="true" />
+        <span class="truncate font-mono text-[12px] max-lg:hidden">{{ route.params.file }}</span>
       </template>
     </nav>
-    <div class="flex flex-none items-center gap-4">
+    <div class="flex flex-none items-center gap-4 max-md:gap-2.5">
+      <button
+        v-if="app.info.assistant"
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1.5 font-semibold transition-colors max-md:px-1.5"
+        :class="assistant.open ? 'bg-white text-brand' : 'text-white/85 hover:bg-white/15 hover:text-white'"
+        aria-controls="assistant"
+        :aria-expanded="assistant.open"
+        @click="assistant.toggle()"
+      ><MessagesSquare :size="16" :stroke-width="1.75" aria-hidden="true" /><span class="max-md:sr-only">Assistant</span></button>
       <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-bold" :class="app.author ? 'bg-white/15 text-white' : 'bg-needs text-white'" :title="envTitle">
         <span class="size-2 rounded-full" :class="app.author ? 'bg-live' : 'bg-white'" aria-hidden="true"></span>{{ app.info.env }}<template v-if="!app.author"> · deploy only</template>
       </span>
@@ -41,8 +53,9 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { ChevronRight } from 'lucide-vue-next';
+import { ChevronRight, MessagesSquare } from 'lucide-vue-next';
 import LineBullet from './LineBullet.vue';
+import { assistant } from '../lib/assistant';
 import { space } from '../lib/space';
 import { app, spaceIdFromRoute, spacePath } from '../store';
 

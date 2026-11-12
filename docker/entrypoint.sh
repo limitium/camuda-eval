@@ -16,6 +16,10 @@
 #   RULES_USER           without a proxy in front: who every request is (a demo only)
 #   KAFKA_PROPERTIES     extra client properties for every app, space-separated key=value
 #                          e.g. "security.protocol=SASL_SSL sasl.mechanism=PLAIN"
+#   ASSISTANT_URL        an OpenAI-compatible server running Qwen, for the assistant panel
+#                          e.g. http://host.docker.internal:11434/v1                (default: none)
+#   ASSISTANT_MODEL      the model's name on that server                          (default qwen2.5:7b)
+#   ASSISTANT_KEY        a bearer token, if that server wants one
 #   JAVA_OPTS            JVM options
 set -euo pipefail
 
@@ -42,6 +46,11 @@ if [ -n "${GIT_REMOTE_URL:-}" ]; then
   [ -n "${GIT_TOKEN:-}" ] && args+=("--dmn.git.token=$GIT_TOKEN")
 fi
 
+if [ -n "${ASSISTANT_URL:-}" ]; then
+  args+=("--dmn.assistant.url=$ASSISTANT_URL" "--dmn.assistant.model=${ASSISTANT_MODEL:-qwen2.5:7b}")
+  [ -n "${ASSISTANT_KEY:-}" ] && args+=("--dmn.assistant.api-key=$ASSISTANT_KEY")
+fi
+
 if [ -n "${RULES_USER:-}" ]; then
   args+=("--dmn.auth.allow-anonymous=true" "--dmn.auth.anonymous-user=$RULES_USER")
 fi
@@ -59,5 +68,5 @@ for spec in ${RULES_APPS:-}; do
   echo "rules: $name reads ${files} from topic ${topic} on ${KAFKA_BOOTSTRAP}"
 done
 
-echo "rules: tier ${RULES_ENV}, role ${ROLE}, drafts ${RULES_ALLOW_DRAFT}, remote ${GIT_REMOTE_URL:-none}"
+echo "rules: tier ${RULES_ENV}, role ${ROLE}, drafts ${RULES_ALLOW_DRAFT}, remote ${GIT_REMOTE_URL:-none}, assistant ${ASSISTANT_URL:-none}"
 exec java ${JAVA_OPTS:-} -jar /app/rules.jar "${args[@]}"

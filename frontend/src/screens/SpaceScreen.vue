@@ -14,29 +14,29 @@
         </div>
       </header>
 
-      <!-- The domains and the network side by side: both columns start on the same line. -->
-      <div class="mt-8 grid items-start gap-10" :class="spaceId ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)] max-[1200px]:grid-cols-1' : ''">
+      <!-- The domains and the graph side by side: both columns start on the same line. -->
+      <div class="mt-8 grid items-start gap-10" :class="spaceId ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @max-[1200px]:grid-cols-1' : ''">
       <div class="min-w-0">
         <div class="rows">
           <div
             v-for="t in space.tables"
             :key="t"
-            class="group/row grid min-h-[60px] grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-5 rounded-sm px-2 hover:bg-hover max-[760px]:grid-cols-[1fr_auto] max-[760px]:gap-y-1 max-[760px]:pb-2"
+            class="group/row grid min-h-[60px] grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-5 rounded-sm px-2 hover:bg-hover @max-[760px]:grid-cols-[1fr_auto] @max-[760px]:gap-y-1 @max-[760px]:pb-2"
           >
-            <router-link :to="spacePath(spaceId, `/table/${t}`)" class="group/open grid min-w-0 gap-0.5 py-3 no-underline max-[760px]:col-start-1 max-[760px]:row-start-1">
+            <router-link :to="spacePath(spaceId, `/table/${t}`)" class="group/open grid min-w-0 gap-0.5 py-3 no-underline @max-[760px]:col-start-1 @max-[760px]:row-start-1">
               <span class="text-lg font-semibold group-hover/open:underline">{{ t }}</span>
               <span class="truncate text-sm text-ink-2">{{ decisionsOf(t) }}</span>
             </router-link>
-            <span v-if="problems[t]?.hasErrors || verdicts[t]" class="max-[760px]:col-start-1">
+            <span v-if="problems[t]?.hasErrors || verdicts[t]" class="@max-[760px]:col-start-1">
               <span v-if="problems[t]?.hasErrors" class="state state-needs">Tests don’t match the tables</span>
               <span v-else-if="verdicts[t] && !verdicts[t].passed" class="state state-needs">{{ verdicts[t].failed }} failing</span>
               <span v-else-if="verdicts[t]?.passed" class="state state-clean">Tests pass</span>
             </span>
-            <span v-if="space.changeOf(t)" class="max-[760px]:col-start-1">
+            <span v-if="space.changeOf(t)" class="@max-[760px]:col-start-1">
               <span v-if="space.changeOf(t) === 'new'" class="state state-edit">New</span>
               <span v-else-if="space.changeOf(t) === 'changed'" class="state state-edit">Changed</span>
             </span>
-            <span class="flex min-w-9 items-center justify-end gap-2 max-[760px]:col-start-2 max-[760px]:row-start-1">
+            <span class="flex min-w-9 items-center justify-end gap-2 @max-[760px]:col-start-2 @max-[760px]:row-start-1">
               <button
                 v-if="confirming !== t"
                 type="button"
@@ -72,26 +72,27 @@
 
       <details v-if="space.info" class="group/mech mt-12 text-sm text-ink-2">
         <summary class="inline-flex w-max cursor-pointer list-none items-center gap-1 font-semibold [&::-webkit-details-marker]:hidden">
-          <ChevronRight :size="16" :stroke-width="1.75" class="transition-[rotate] duration-150 ease-out group-open/mech:rotate-90" aria-hidden="true" />Version details
+          <ChevronRight :size="16" :stroke-width="1.75" class="transition-[rotate] duration-150 ease-out group-open/mech:rotate-90" aria-hidden="true" />Commit details
         </summary>
         <dl class="mt-3.5 mb-4 grid grid-cols-[max-content_1fr] gap-x-5 gap-y-1.5">
           <dt class="text-ink-3">Branch</dt><dd class="m-0 font-mono text-[0.8125rem] text-ink">{{ space.info.id }}</dd>
           <dt class="text-ink-3">Built on</dt><dd class="m-0 font-mono text-[0.8125rem] text-ink">{{ space.info.baseline }}</dd>
-          <dt class="text-ink-3">Lands in</dt>
+          <dt class="text-ink-3">Merges into</dt>
           <dd class="m-0 flex items-center gap-2 text-ink">
             <LineBullet v-if="space.info.targetLine" :line="space.info.targetLine" :main-branch="app.info.mainBranch" size="sm" />
             <span class="font-mono text-[0.8125rem]">{{ space.info.targetLine }}</span>
           </dd>
-          <dt class="text-ink-3">Last version</dt><dd class="m-0 text-ink"><span class="mono">{{ space.info.head?.slice(0, 7) }}</span> “{{ space.info.lastMessage }}” — {{ space.info.lastModifiedBy }}, <span class="text-xs text-ink-3">{{ whenText(space.info.lastModifiedAt) }}</span></dd>
-          <dt class="text-ink-3">Saved versions not landed</dt><dd class="m-0 text-ink">{{ space.info.ahead }}</dd>
+          <dt class="text-ink-3">Last commit</dt><dd class="m-0 text-ink"><span class="mono">{{ space.info.head?.slice(0, 7) }}</span> “{{ space.info.lastMessage }}” — {{ space.info.lastModifiedBy }}, <span class="text-xs text-ink-3">{{ whenText(space.info.lastModifiedAt) }}</span></dd>
+          <dt class="text-ink-3">Commits not merged</dt><dd class="m-0 text-ink">{{ space.info.ahead }}</dd>
         </dl>
         <button v-if="space.info.owner === app.info.user" type="button" class="btn btn-small btn-danger" @click="deleteSpace">Delete this work space</button>
       </details>
       </div>
 
-      <!-- Where this work space sits: forked from its line, and what has happened on both since. The one
-           graph on the screen; while changes can be brought in, it is also where they are picked. -->
-      <div v-if="spaceId && space.info" ref="graphSide" class="sticky grid min-w-0 gap-6 max-[1200px]:static" :style="{ top: `${stickTop}px` }">
+      <!-- Where this work space sits: branched from main or a release branch, and what has happened on
+           both since. The one graph on the screen; while another branch can be merged in, it is also where
+           that branch is picked. -->
+      <div v-if="spaceId && space.info" ref="graphSide" class="sticky grid min-w-0 gap-6 @max-[1200px]:static" :style="{ top: `${stickTop}px` }">
         <BranchGraph
           v-if="history"
           caption="Where this work space is"
@@ -100,7 +101,7 @@
           :picked="bringing ? bringFrom || null : null"
           :pickable="bringing ? bringPickable : []"
           :ghost="bringing && bringFrom ? [{ lane: spaceId, from: bringFrom }] : []"
-          :ghost-text="bringing && bringFrom ? `Brings ${branchName(bringFrom, app.info.mainBranch)} into this work space` : ''"
+          :ghost-text="bringing && bringFrom ? `Merges ${bringFrom} into this work space` : ''"
           :main-branch="app.info.mainBranch"
           @pick="(ref) => (bringFrom = ref)"
         />
@@ -130,10 +131,11 @@ import { useRoute, useRouter } from 'vue-router';
 import { ChevronRight, Plus, Trash2 } from 'lucide-vue-next';
 import { api } from '../lib/api';
 import { useBar } from '../lib/bar';
+import { useAssistant } from '../lib/assistant';
 import { DmnDocument } from '../lib/dmnModel';
 import { space } from '../lib/space';
 import { useStickyFit } from '../lib/stickyFit';
-import { app, branchName, spaceIdFromRoute, spacePath, whenText } from '../store';
+import { app, spaceIdFromRoute, spacePath, whenText } from '../store';
 
 const route = useRoute();
 const router = useRouter();
@@ -149,7 +151,7 @@ const newName = ref('');
 const addField = ref(null);
 const graphSide = ref(null);
 const stickTop = useStickyFit(graphSide);
-// Bringing in changes: picked in the one graph, with BringIn's controls beneath it.
+// Merging from another branch: picked in the one graph, with BringIn's controls beneath it.
 const bringing = computed(() => Boolean(spaceId && space.info && !space.changes.length));
 const bringFrom = ref('');
 const bringPickable = ref([]);
@@ -162,19 +164,23 @@ const title = computed(() => {
   return space.info?.owner && space.info.owner !== app.info.user ? `${space.info.owner}’s ${route.params.name}` : route.params.name;
 });
 
+// Merged and kept: everything in it is in the branch it merges into, until something changes here.
+const merged = computed(() => !space.changes.length && !!space.info?.saved?.landed);
+
 const intro = computed(() => {
   const n = space.changedTables.length;
+  if (merged.value) return `Merged into ${space.info.targetLine || app.info.mainBranch}: everything in it is there now. Change something to go on here, or remove it on Clean up.`;
   switch (space.current) {
     case 'edit':
       return spaceId ? 'Open a domain to change its tables’ rules or their test cases.' : 'Open a domain to change its tables’ rules or their test cases. Saving writes straight into the shared domains.';
     case 'test':
-      return `${n === 1 ? 'One domain has' : `${n} domains have`} changes. Run the tests before saving a version.`;
+      return `${n === 1 ? 'One domain has' : `${n} domains have`} changes. Run the tests before committing.`;
     case 'version':
-      return 'Tests pass. Save a version so colleagues can see exactly what you changed.';
+      return 'Tests pass. Commit your changes so colleagues can see exactly what you changed.';
     case 'try':
-      return `Your version is saved. Try it in ${app.info.env} against the running app before landing it.`;
+      return `Your changes are committed. Try them in ${app.info.env} against the running app before merging them.`;
     default:
-      return 'Your version is saved. Land it when you are ready.';
+      return 'Your changes are committed. Merge them when you are ready.';
   }
 });
 
@@ -229,7 +235,7 @@ async function remove(t) {
   try {
     await api.deleteFile(spaceId, t, seenVersions[t] ?? null);
     app.forgetVerdict(spaceId, t);
-    app.say(spaceId ? `Removed ${t}. It is gone from this work space; the last saved version still has it until you save a new one.` : `Removed ${t} and its tests.`, 'plain');
+    app.say(spaceId ? `Removed ${t}. It is gone from this work space; the last commit still has it until you commit again.` : `Removed ${t} and its tests.`, 'plain');
     await load();
   } catch (error) {
     if (error.status === 412) {
@@ -244,12 +250,17 @@ async function remove(t) {
 async function deleteSpace() {
   try {
     await api.deleteSpace(spaceId);
-    app.say(`Deleted the work space ${route.params.name}. Versions already landed are unaffected.`, 'plain');
+    app.say(`Deleted the work space ${route.params.name}. Changes already merged are unaffected.`, 'plain');
     router.push('/');
   } catch (error) {
     app.say(`The work space was not deleted: ${error.message}`, 'needs');
   }
 }
+
+useAssistant(() => ({
+  places: Object.fromEntries(space.tables.map((t) => [t, spacePath(spaceId, `/table/${t}`)])),
+  now: `${space.tables.length ? `This work space holds ${space.tables.length === 1 ? 'one domain' : `${space.tables.length} domains`}: ${space.tables.join(', ')}. Rules and test cases are changed by opening a domain (click its name), then its table’s tab.` : 'This work space holds no domains yet.'} ${intro.value}`
+}));
 
 useBar(() => {
   const base = spacePath(spaceId);
@@ -257,11 +268,12 @@ useBar(() => {
     case 'test':
       return { primary: { label: 'Run the tests', run: () => router.push(`${base}/test`) } };
     case 'version':
-      return { primary: { label: 'Review and save version', run: () => router.push(`${base}/version`) } };
+      return { primary: { label: 'Review and commit changes', run: () => router.push(`${base}/version`) } };
     case 'try':
       return { primary: { label: `Try in ${app.info.env}`, run: () => router.push(`${base}/try`) } };
     case 'land':
-      return { primary: { label: 'Land', run: () => router.push(`${base}/land`) } };
+      if (merged.value) return { hint: `Merged into ${space.info.targetLine || app.info.mainBranch}.` };
+      return { primary: { label: 'Merge', run: () => router.push(`${base}/land`) } };
     default:
       if (!space.tables.length && !space.loading) return { primary: { label: 'Add a domain', run: startAdding } };
       return {};

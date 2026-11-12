@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="Definitions_Fee" name="Fee" namespace="http://camunda.org/schema/1.0/dmn">
+  <decision id="FeeCode" name="Fee Code">
+    <decisionTable id="FeeCode_table" hitPolicy="FIRST">
+      <input id="FeeCode_in_country" label="Country">
+        <inputExpression id="FeeCode_ie_country" typeRef="string"><text>country</text></inputExpression>
+      </input>
+      <input id="FeeCode_in_market" label="Market">
+        <inputExpression id="FeeCode_ie_market" typeRef="string"><text>market</text></inputExpression>
+      </input>
+      <input id="FeeCode_in_amount" label="Amount">
+        <inputExpression id="FeeCode_ie_amount" typeRef="number"><text>amount</text></inputExpression>
+      </input>
+      <output id="FeeCode_out_feeCode" label="Fee Code" name="feeCode" typeRef="string" />
+      <output id="FeeCode_out_feeCalculatorId" label="Fee Calculator" name="feeCalculatorId" typeRef="string" />
+      <rule id="FeeCode_r1">
+        <description>Large US main-market trades are tiered</description>
+        <inputEntry id="FeeCode_r1_c"><text>"US"</text></inputEntry>
+        <inputEntry id="FeeCode_r1_m"><text>"NYSE","NASDAQ"</text></inputEntry>
+        <inputEntry id="FeeCode_r1_a"><text>&gt;= 1000000</text></inputEntry>
+        <outputEntry id="FeeCode_r1_o1"><text>"US-LRG"</text></outputEntry>
+        <outputEntry id="FeeCode_r1_o2"><text>"TIERED"</text></outputEntry>
+      </rule>
+      <rule id="FeeCode_r2">
+        <description>Standard US main-market trades pay flat basis points</description>
+        <inputEntry id="FeeCode_r2_c"><text>"US"</text></inputEntry>
+        <inputEntry id="FeeCode_r2_m"><text>"NYSE","NASDAQ"</text></inputEntry>
+        <inputEntry id="FeeCode_r2_a"><text>-</text></inputEntry>
+        <outputEntry id="FeeCode_r2_o1"><text>"US-STD"</text></outputEntry>
+        <outputEntry id="FeeCode_r2_o2"><text>"BPS-FLAT"</text></outputEntry>
+      </rule>
+      <rule id="FeeCode_r3">
+        <description>US OTC trades pay five bps with a minimum</description>
+        <inputEntry id="FeeCode_r3_c"><text>"US"</text></inputEntry>
+        <inputEntry id="FeeCode_r3_m"><text>"OTC"</text></inputEntry>
+        <inputEntry id="FeeCode_r3_a"><text>-</text></inputEntry>
+        <outputEntry id="FeeCode_r3_o1"><text>"US-OTC"</text></outputEntry>
+        <outputEntry id="FeeCode_r3_o2"><text>"BPS-MIN"</text></outputEntry>
+      </rule>
+      <rule id="FeeCode_r4">
+        <description>LSE trades carry stamp duty</description>
+        <inputEntry id="FeeCode_r4_c"><text>"GB"</text></inputEntry>
+        <inputEntry id="FeeCode_r4_m"><text>"LSE"</text></inputEntry>
+        <inputEntry id="FeeCode_r4_a"><text>-</text></inputEntry>
+        <outputEntry id="FeeCode_r4_o1"><text>"UK-STAMP"</text></outputEntry>
+        <outputEntry id="FeeCode_r4_o2"><text>"STAMP"</text></outputEntry>
+      </rule>
+      <rule id="FeeCode_r5">
+        <description>EU domestic markets pay flat basis points</description>
+        <inputEntry id="FeeCode_r5_c"><text>"FR","DE","NL"</text></inputEntry>
+        <inputEntry id="FeeCode_r5_m"><text>-</text></inputEntry>
+        <inputEntry id="FeeCode_r5_a"><text>-</text></inputEntry>
+        <outputEntry id="FeeCode_r5_o1"><text>"EU-STD"</text></outputEntry>
+        <outputEntry id="FeeCode_r5_o2"><text>"BPS-FLAT"</text></outputEntry>
+      </rule>
+      <rule id="FeeCode_r6">
+        <description>Everything else pays five bps with a minimum</description>
+        <inputEntry id="FeeCode_r6_c"><text>-</text></inputEntry>
+        <inputEntry id="FeeCode_r6_m"><text>-</text></inputEntry>
+        <inputEntry id="FeeCode_r6_a"><text>-</text></inputEntry>
+        <outputEntry id="FeeCode_r6_o1"><text>"XX-MIN"</text></outputEntry>
+        <outputEntry id="FeeCode_r6_o2"><text>"BPS-MIN"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="FeeCalculator" name="Fee Calculator">
+    <informationRequirement id="FeeCalculator_requires_FeeCode">
+      <requiredDecision href="#FeeCode" />
+    </informationRequirement>
+    <decisionTable id="FeeCalculator_table" hitPolicy="FIRST">
+      <input id="FeeCalculator_in_calculator" label="Fee Calculator">
+        <inputExpression id="FeeCalculator_ie_calculator" typeRef="string"><text>feeCalculatorId</text></inputExpression>
+      </input>
+      <input id="FeeCalculator_in_qty" label="Quantity">
+        <inputExpression id="FeeCalculator_ie_qty" typeRef="number"><text>qty</text></inputExpression>
+      </input>
+      <input id="FeeCalculator_in_amount" label="Amount">
+        <inputExpression id="FeeCalculator_ie_amount" typeRef="number"><text>amount</text></inputExpression>
+      </input>
+      <input id="FeeCalculator_in_feeCode" label="feeCode">
+        <inputExpression id="FeeCalculator_ie_feeCode" typeRef="string"><text>feeCode</text></inputExpression>
+      </input>
+      <output id="FeeCalculator_out_feeAmount" label="Fee Amount" name="feeAmount" typeRef="number" />
+      <rule id="FeeCalculator_r1">
+        <description>Tiered: 5 bps on the first million, 2 bps above it</description>
+        <inputEntry id="FeeCalculator_r1_k"><text>"TIERED"</text></inputEntry>
+        <inputEntry id="FeeCalculator_r1_q"><text>-</text></inputEntry>
+        <inputEntry id="FeeCalculator_r1_a"><text>&gt;= 1000000</text></inputEntry>
+        <inputEntry id="FeeCalculator_r1_f"><text>-</text></inputEntry>
+        <outputEntry id="FeeCalculator_r1_o"><text>(1000000 * 5 + (amount - 1000000) * 2) / 10000</text></outputEntry>
+      </rule>
+      <rule id="FeeCalculator_r2">
+        <description>Tiered below the break works out flat</description>
+        <inputEntry id="FeeCalculator_r2_k"><text>"TIERED"</text></inputEntry>
+        <inputEntry id="FeeCalculator_r2_q"><text>-</text></inputEntry>
+        <inputEntry id="FeeCalculator_r2_a"><text>&lt; 1000000</text></inputEntry>
+        <inputEntry id="FeeCalculator_r2_f"><text>-</text></inputEntry>
+        <outputEntry id="FeeCalculator_r2_o"><text>amount * 5 / 10000</text></outputEntry>
+      </rule>
+      <rule id="FeeCalculator_r3">
+        <description>Flat 5 bps on the traded amount</description>
+        <inputEntry id="FeeCalculator_r3_k"><text>"BPS-FLAT"</text></inputEntry>
+        <inputEntry id="FeeCalculator_r3_q"><text>-</text></inputEntry>
+        <inputEntry id="FeeCalculator_r3_a"><text>-</text></inputEntry>
+        <inputEntry id="FeeCalculator_r3_f"><text>-</text></inputEntry>
+        <outputEntry id="FeeCalculator_r3_o"><text>amount * 5 / 10000</text></outputEntry>
+      </rule>
+      <rule id="FeeCalculator_r4">
+        <description>55 bps in all: 5 bps commission plus 50 bps stamp duty</description>
+        <inputEntry id="FeeCalculator_r4_k"><text>"STAMP"</text></inputEntry>
+        <inputEntry id="FeeCalculator_r4_q"><text>-</text></inputEntry>
+        <inputEntry id="FeeCalculator_r4_a"><text>-</text></inputEntry>
+        <inputEntry id="FeeCalculator_r4_f"><text>-</text></inputEntry>
+        <outputEntry id="FeeCalculator_r4_o"><text>amount * 55 / 10000</text></outputEntry>
+      </rule>
+      <rule id="FeeCalculator_r5">
+        <description>Five bps on the amount, never below 10</description>
+        <inputEntry id="FeeCalculator_r5_k"><text>"BPS-MIN"</text></inputEntry>
+        <inputEntry id="FeeCalculator_r5_q"><text>-</text></inputEntry>
+        <inputEntry id="FeeCalculator_r5_a"><text>-</text></inputEntry>
+        <inputEntry id="FeeCalculator_r5_f"><text>-</text></inputEntry>
+        <outputEntry id="FeeCalculator_r5_o"><text>max(amount * 5 / 10000, 10)</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

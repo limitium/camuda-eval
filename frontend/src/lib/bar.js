@@ -8,7 +8,24 @@ import { onBeforeUnmount, reactive, watchEffect } from 'vue';
 export const bar = reactive({
   primary: null, // { label, run, disabled, busy }
   secondary: [], // [{ label, run, disabled, danger }]
-  hint: null // what the next action is waiting for, in words
+  hint: null, // what the next action is waiting for, in words
+  running: null, // the action being run, whoever pressed it
+
+  /** The buttons that can be pressed now, the next action first. */
+  get pressable() {
+    return [this.primary, ...this.secondary].filter((a) => a && !a.disabled && !a.busy);
+  },
+
+  /** Presses a button: the same run as a click, busy for as long as it takes, one at a time. */
+  async press(action) {
+    if (!action || this.running) return;
+    this.running = action;
+    try {
+      await action.run();
+    } finally {
+      this.running = null;
+    }
+  }
 });
 
 export function useBar(describe) {

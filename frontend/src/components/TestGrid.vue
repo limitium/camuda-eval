@@ -12,7 +12,7 @@
     </ul>
 
     <div v-if="!block" class="grid max-w-[70ch] justify-items-start gap-3 border-t border-rule py-4">
-      <p>No test cases for {{ decisionName }} yet. Tests prove the table does what you mean, and landing needs every rule covered.</p>
+      <p>No test cases for {{ decisionName }} yet. Tests prove the table does what you mean, and merging needs every rule covered.</p>
       <button v-if="!readonly" type="button" class="btn" @click="$emit('create-block')"><Plus :size="16" aria-hidden="true" /> Add test cases</button>
     </div>
 
@@ -83,8 +83,11 @@
                   @keydown="onKey($event, r, c)"
                 />
               </td>
-              <td v-if="!readonly" class="tools w-10 border-b border-l border-rule px-1 align-middle">
-                <button type="button" class="tool grid size-7 place-items-center rounded text-ink-3 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-needs-tint hover:text-needs-ink [@media(hover:none)]:opacity-100" :aria-label="`Remove case ${r + 1}`" title="Remove case" @click="$emit('remove-row', r)"><Trash2 :size="16" :stroke-width="1.75" /></button>
+              <td v-if="!readonly" class="tools w-[66px] border-b border-l border-rule px-1 align-middle">
+                <span class="flex gap-0.5">
+                  <button type="button" class="tool grid size-7 place-items-center rounded text-ink-3 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-hover hover:text-ink" :aria-label="`Copy case ${r + 1}`" title="Copy case" @click="copyRow(r)"><Copy :size="16" :stroke-width="1.75" /></button>
+                  <button type="button" class="tool grid size-7 place-items-center rounded text-ink-3 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-needs-tint hover:text-needs-ink" :aria-label="`Remove case ${r + 1}`" title="Remove case" @click="$emit('remove-row', r)"><Trash2 :size="16" :stroke-width="1.75" /></button>
+                </span>
               </td>
             </tr>
             <tr v-if="resultOf(row)?.passed === false" class="why">
@@ -106,7 +109,7 @@
 <script setup>
 import { plainFailure } from '../lib/failures';
 import { computed, nextTick, ref } from 'vue';
-import { Check, Plus, Trash2, X } from 'lucide-vue-next';
+import { Check, Copy, Plus, Trash2, X } from 'lucide-vue-next';
 import { SCENARIO, expectationColumn, expectationName, isExpectation } from '../lib/testSpec';
 
 const props = defineProps({
@@ -115,6 +118,8 @@ const props = defineProps({
   hint: { type: Object, default: null }, // { suppliedVariables, outputs }
   problems: { type: Array, default: () => [] },
   results: { type: Array, default: null }, // [{ name, passed, error }] from the last run
+  // That run was before the latest changes: its results stay, said to be from then.
+  stale: { type: Boolean, default: false },
   // Changed here and not saved, from testEdits(): cells by `${row}|${col}`, new rows, new columns.
   cellStates: { type: Object, default: () => ({}) },
   rowStates: { type: Object, default: () => ({}) },
@@ -128,7 +133,7 @@ const props = defineProps({
   // Look, run and compare only: nothing can be typed, added or removed (a deploy-only instance).
   readonly: { type: Boolean, default: false }
 });
-const emit = defineEmits(['cell', 'add-row', 'remove-row', 'add-column', 'remove-column', 'create-block']);
+const emit = defineEmits(['cell', 'add-row', 'copy-row', 'remove-row', 'add-column', 'remove-column', 'create-block']);
 const wrap = ref(null);
 
 const kindOf = (col) => (col === SCENARIO ? 'scenario' : isExpectation(col) ? 'expect' : 'supply');
@@ -158,6 +163,7 @@ const summary = computed(() => {
   const own = props.block.rows.map(resultOf).filter(Boolean);
   if (!props.results || !own.length) return `${cases}, not run since the last change`;
   const failed = own.filter((r) => !r.passed).length;
+  if (props.stale) return `${cases} · at the last run, before your latest changes: ${failed ? `${failed} failing` : 'all passing'}. Run the tests again to check them.`;
   return failed ? `${cases}, ${failed} failing` : `${cases}, all passing`;
 });
 
@@ -202,6 +208,15 @@ async function addRow() {
   emit('add-row');
   await nextTick();
   wrap.value?.querySelector(`[data-cell="${props.block.rows.length - 1}:0"]`)?.focus();
+}
+
+// The copy lands right under its original, its name selected: a copy is usually the start of a variant.
+async function copyRow(r) {
+  emit('copy-row', r);
+  await nextTick();
+  const name = wrap.value?.querySelector(`[data-cell="${r + 1}:0"]`);
+  name?.focus();
+  name?.select();
 }
 
 async function onKey(event, row, col) {

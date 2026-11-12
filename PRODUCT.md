@@ -45,21 +45,21 @@ instead of lines. That is the mechanism nothing else offers:
 ## Operating Context
 
 - **Working spaces**: each analyst works in their own space, started from a baseline they choose by
-  navigating release lines and the versions running in each environment. Anyone may open anyone's.
-- **The flow**: edit → save (a draft) → save a version with a message (visible to everyone) →
-  publish to this environment to try it against the running app → land it.
-- **Landing is all or nothing**: it merges into the target release line and carries the change forward
-  through every newer line to main, gated by tests at every step. Conflicts from every step arrive at
-  once; nothing lands until all are resolved.
+  navigating main, the release branches and the tags running in each environment. Anyone may open anyone's.
+- **The flow**: edit → save (a draft) → commit the changes with a message (visible to everyone) →
+  publish to this environment to try it against the running app → merge it.
+- **Merging is all or nothing**: it merges into the target release branch and from there into every
+  newer release branch and main, gated by tests at every step. Conflicts from every step arrive at
+  once; nothing is merged until all are resolved.
 - **Editing together is non-destructive**: a save built on a version someone else has since replaced is
   refused and there is no overwrite anywhere; the way forward is the three-way merge.
 - **Environments** (dev, stg, prod) each run their own instance of the app against an isolated Kafka
   broker; each instance sees only its own environment. Prod has no authoring at all — only choosing a
-  released version, reviewing what changes, and deploying it.
+  release tag, reviewing what changes, and deploying it.
 - **Shipping**: one compacted, single-partition topic per environment, one key per DMN file, keys fixed
   in the consuming app's build. Publishing a draft therefore replaces the shared rules in that
   environment until a release is restored — allowed only where configured (dev), never silently.
-- **What is shipped here** is read back from the topic and compared with version history: which
+- **What is shipped here** is read back from the topic and compared with git history: which
   release or whose draft each table runs, and where the two disagree.
 
 ## Capabilities and Constraints
@@ -74,9 +74,9 @@ instead of lines. That is the mechanism nothing else offers:
   modify; test expectation; test delete vs modify; test added twice. Three tiers: ignored (layout, ids,
   formatting), cosmetic (names, labels, descriptions — bulk-resolvable), semantic.
 - Existing: a visual DMN modeller (dmn-js) and a text editor (Monaco) are part of the app today.
-- Built backend: working spaces (list, create, delete, save a version), content scoped to a working
+- Built backend: working spaces (list, create, delete, commit), content scoped to a working
   space with version checks, semantic diff and three-way merge preview, test hints and test problems.
-- Designed, not yet built: release lines and versions, the landing chain, deploy/publish/restore,
+- Designed, not yet built: release branches and tags, the merge chain, deploy/publish/restore,
   and the shipped-state read-back.
 - UI library: **free to replace** — no commitment to ant-design-vue.
 
@@ -94,8 +94,10 @@ screenshots of production use, or metrics exist; none may be invented.
 
 **The cleanest interface, focused on the current single action**, usable by someone with no technical
 background. Pinned by the user over every generated direction. Each screen serves one step of the
-rule's journey and offers one obvious next action; everything else is out of the way. Git, XML and
-Kafka vocabulary never appear on the surface.
+rule's journey and offers one obvious next action; everything else is out of the way. XML and Kafka
+vocabulary never appear on the surface. For history the interface does not invent its own dictionary:
+it uses git's words and names — branch, commit, merge, pull, tag, `main`, `release/1.0` — while the
+colours, bullets and graph drawing stay.
 
 ## Product Principles
 
@@ -106,7 +108,7 @@ Kafka vocabulary never appear on the surface.
    the table itself.
 3. **Say what happened, and whose it was.** Conflicts, drafts and shipped state carry the person and
    the message behind them. No silent fallbacks, no guessed defaults.
-4. **The analyst's task first, the mechanism on demand.** Version, land, publish — with the git truth
+4. **The analyst's task first, the mechanism on demand.** Commit, merge, publish — with the git truth
    one step away for whoever needs it.
 5. **Destructive is loud.** Publishing a draft replaces what an environment runs; the product says so
    before it happens and offers the way back after.

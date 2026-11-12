@@ -1,0 +1,19 @@
+tests:
+  - decision: FeeCode
+    columns: [scenario,                    country, market, amount,  "=> feeCode", "=> feeCalculatorId"]
+    rows:
+      - [large US main-market trade,       US,      NYSE,   2000000, US-LRG,       TIERED]
+      - [standard US main-market trade,    US,      NASDAQ, 50000,   US-STD,       BPS-FLAT]
+      - [US over the counter,              US,      OTC,    1000,    US-OTC,       BPS-MIN]
+      - [London pays stamp duty,           GB,      LSE,    10000,   UK-STAMP,     STAMP]
+      - [Paris is an EU domestic market,   FR,      EPA,    10000,   EU-STD,       BPS-FLAT]
+      - [anywhere else,                    JP,      TSE,    1000,    XX-MIN,       BPS-MIN]
+
+  - decision: FeeCalculator
+    columns: [scenario,                    country, market, amount,  qty, "=> feeAmount"]
+    rows:
+      - [tiered above the first million,   US,      NYSE,   2000000, 100, 700]
+      - [flat five bps,                    US,      NASDAQ, 500000,  50,  250]
+      - [stamp duty in London,             GB,      LSE,    10000,   10,  55]
+      - [minimum applies to a small trade, US,      OTC,    1000,    1,   10]
+      - [five bps above the minimum,       JP,      TSE,    400000,  20,  200]

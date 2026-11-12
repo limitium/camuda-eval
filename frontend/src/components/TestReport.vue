@@ -39,7 +39,7 @@
 import { computed } from 'vue';
 import { plainFailure } from '../lib/failures';
 
-/* Every domain's tests at one version — what a deploy of that version runs first. */
+/* Every domain's tests at one commit — what a deploy of that commit runs first. */
 const props = defineProps({
   report: { type: Object, default: null }, // DeployService.TestReport
   busy: { type: Boolean, default: false },
@@ -52,5 +52,5 @@ const props = defineProps({
   plain: { type: Boolean, default: false }
 });
 
-const label = computed(() => props.rev || props.report?.commit?.slice(0, 7) || 'this version');
+const label = computed(() => props.rev || props.report?.commit?.slice(0, 7) || 'this commit');
 </script>

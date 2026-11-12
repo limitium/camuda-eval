@@ -3,6 +3,9 @@
 #
 #   docker compose up --build        dev UI on http://localhost:7080, prod UI on http://localhost:7081
 #
+# The host ports are variables, so a second stack can run beside this one (e2e/run.sh does):
+#   DEV_PORT=7180 PROD_PORT=7181 KAFKA_DEV_PORT=19192 KAFKA_PROD_PORT=29192 docker compose -p other up -d
+#
 # dev is where rules are authored, tested, released and tried; prod only deploys released versions.
 #
 # Every instance is described by plain variables (see docker/entrypoint.sh): its tier, its brokers,
@@ -29,7 +32,8 @@ x-kafka: &kafka
     retries: 30
 
 # The applications both tiers deploy to: name=files[@topic]. Topics default to dmn-{app}-{env}.
-x-apps: &apps ${RULES_APPS:-emea-street=pricing,fees amer-street=pricing}
+# Both read the one domain of the demo, fee (its tables Fee Code and Fee Calculator).
+x-apps: &apps ${RULES_APPS:-emea-street=fee amer-street=fee}
 
 services:
   # --- dev tier ----------------------------------------------------------------------------------
@@ -38,10 +42,10 @@ services:
     hostname: kafka-dev
     environment:
       <<: *kafka-env
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,HOST://:19092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-dev:9092,HOST://localhost:19092
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,HOST://:${KAFKA_DEV_PORT:-19092}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-dev:9092,HOST://localhost:${KAFKA_DEV_PORT:-19092}
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-dev:9093
-    ports: ["19092:19092"]   # for consumers on the host: localhost:19092
+    ports: ["${KAFKA_DEV_PORT:-19092}:${KAFKA_DEV_PORT:-19092}"]   # for consumers on the host: localhost:19092
 
   topics-dev:
     image: apache/kafka:3.8.0
@@ -57,7 +61,7 @@ services:
 
   rules-dev:
     build: .
-    image: camunda-eval:demo
+    image: ${RULES_IMAGE:-camunda-eval:demo}
     depends_on:
       git: { condition: service_completed_successfully }
       topics-dev: { condition: service_completed_successfully }
@@ -70,8 +74,12 @@ services:
       RULES_TOPIC_TEMPLATE: ${RULES_TOPIC_TEMPLATE:-}   # empty: dmn-{app}-{env}
       GIT_REMOTE_URL: file:///git/rules.git
       RULES_USER: ${DEV_USER:-alice}   # no proxy in the demo: everyone here is this person
+      # The assistant panel: a Qwen server speaking the OpenAI API, e.g. Ollama on the host:
+      #   ASSISTANT_URL=http://host.docker.internal:11434/v1 docker compose up -d
+      ASSISTANT_URL: ${ASSISTANT_URL:-}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-qwen2.5:7b}
     volumes: ["rules-git:/git", "dev-data:/data"]
-    ports: ["7080:7070"]
+    ports: ["${DEV_PORT:-7080}:7070"]
 
   # --- prod tier: deploy only ---------------------------------------------------------------------------------
   kafka-prod:
@@ -79,10 +87,10 @@ services:
     hostname: kafka-prod
     environment:
       <<: *kafka-env
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,HOST://:29092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-prod:9092,HOST://localhost:29092
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,HOST://:${KAFKA_PROD_PORT:-29092}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-prod:9092,HOST://localhost:${KAFKA_PROD_PORT:-29092}
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-prod:9093
-    ports: ["29092:29092"]   # for consumers on the host: localhost:29092
+    ports: ["${KAFKA_PROD_PORT:-29092}:${KAFKA_PROD_PORT:-29092}"]   # for consumers on the host: localhost:29092
 
   topics-prod:
     image: apache/kafka:3.8.0
@@ -97,7 +105,7 @@ services:
     restart: "no"
 
   rules-prod:
-    image: camunda-eval:demo
+    image: ${RULES_IMAGE:-camunda-eval:demo}
     depends_on:
       rules-dev: { condition: service_started }   # same image, built once
       topics-prod: { condition: service_completed_successfully }
@@ -110,15 +118,20 @@ services:
       RULES_TOPIC_TEMPLATE: ${RULES_TOPIC_TEMPLATE:-}   # empty: dmn-{app}-{env}
       GIT_REMOTE_URL: file:///git/rules.git
       RULES_USER: ${PROD_USER:-carol}
+      # The assistant panel: a Qwen server speaking the OpenAI API, e.g. Ollama on the host:
+      #   ASSISTANT_URL=http://host.docker.internal:11434/v1 docker compose up -d
+      ASSISTANT_URL: ${ASSISTANT_URL:-}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-qwen2.5:7b}
     volumes: ["rules-git:/git", "prod-data:/data"]
-    ports: ["7081:7070"]
+    ports: ["${PROD_PORT:-7081}:7070"]
 
   # --- where the instances meet --------------------------------------------------------------------
-  # A bare repository on a shared volume; in production, any git server (GIT_REMOTE_URL + GIT_TOKEN).
+  # A bare repository on a shared volume, seeded once with the demo's rules (docker/seed); in
+  # production, any git server (GIT_REMOTE_URL + GIT_TOKEN).
   git:
     image: alpine/git:2.45.2
-    volumes: ["rules-git:/git"]
-    entrypoint: ["sh", "-c", "[ -d /git/rules.git ] || git init --bare --initial-branch=main /git/rules.git"]
+    volumes: ["rules-git:/git", "./docker/seed:/seed:ro", "./docker/seed.sh:/seed.sh:ro"]
+    entrypoint: ["sh", "/seed.sh"]
     restart: "no"
 
 volumes:

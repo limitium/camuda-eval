@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { requestEnded, requestStarted } from './progress';
+import { activity, requestEnded, requestStarted } from './progress';
 
 // Injected by the backend at runtime when the app is served under a path prefix.
 const BASE_URL = (window.BASE_URL || '/').replace(/\/+/g, '/');
@@ -48,7 +48,7 @@ export const api = {
   async spaces() {
     return (await call(http.get('/api/workspaces'))).data;
   },
-  /** Every commit of main and the release lines, newest first, each on its line's lane. */
+  /** Every commit of main, the release branches and the work spaces, newest first, each on its branch's lane. */
   async history(days = 0) {
     return (await call(http.get('/api/workspaces/history', { params: days ? { days } : {} }))).data;
   },
@@ -67,7 +67,7 @@ export const api = {
   async changes(id) {
     return (await call(http.get(`/api/workspaces/${id}/changes`))).data.files;
   },
-  /** The file as of the space's last saved version, or null when it is new since then. */
+  /** The file as of the space's last commit, or null when it is new since then. */
   async savedContent(id, path) {
     try {
       return (await http.get(`/api/workspaces/${id}/saved`, { params: { path }, responseType: 'text' })).data;
@@ -161,13 +161,18 @@ export const api = {
     form.append('fileName', file);
     form.append('dmnContent', new Blob([dmnXml], { type: 'application/xml' }), `${file}.dmn`);
     form.append('yamlContent', new Blob([testsText], { type: 'text/plain' }), `${file}.yaml`);
-    const started = (await call(http.post('/api/runs', form))).data;
-    for (let attempt = 0; attempt < 240; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, attempt < 10 ? 150 : 500));
-      const status = (await call(http.get(`/api/runs/${started.id}/status`))).data;
-      if (status.state !== 'running') return status;
+    const done = activity();
+    try {
+      const started = (await call(http.post('/api/runs', form))).data;
+      for (let attempt = 0; attempt < 240; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, attempt < 10 ? 150 : 500));
+        const status = (await call(http.get(`/api/runs/${started.id}/status`))).data;
+        if (status.state !== 'running') return status;
+      }
+      throw new ApiError(0, 'the test run did not finish in time');
+    } finally {
+      done();
     }
-    throw new ApiError(0, 'the test run did not finish in time');
   },
 
   // --- diff and merge ---------------------------------------------------------------------------
@@ -206,27 +211,27 @@ export const api = {
   async publishDraft(application, workspace) {
     return (await call(http.post(`/api/applications/${enc(application)}/draft`, { workspace, confirm: true }))).data;
   },
-  /** Where a new space can start: main, release lines and spaces, each at its newest commit (fetched first). */
+  /** Where a new space can start: main, release branches and spaces, each at its newest commit (fetched first). */
   async bases() {
     return (await call(http.get('/api/workspaces/bases'))).data;
   },
 
-  // --- release lines, versions, landing ------------------------------------------------------------
+  // --- release branches, tags, merging -------------------------------------------------------------
 
-  /** main and every release line: newest commit, versions (verified or not), what releasing would make. */
+  /** main and every release branch: newest commit, tags (verified or not), what tagging would make. */
   async lines() {
     return (await call(http.get('/api/lifecycle/lines'))).data;
   },
-  /** Makes the line's next version, only on green tests; with check, only says what it would make. */
-  async release(line, notes, check = false, at = null) {
-    return (await call(http.post('/api/lifecycle/release', { line, notes, check, at }))).data;
+  /** Makes the release branch's next tag, only on green tests; with check, only says what it would make. */
+  async release(line, notes, check = false, at = null, version = null) {
+    return (await call(http.post('/api/lifecycle/release', { line, notes, check, at, version }))).data;
   },
-  /** Opens a release line at a commit of main (its newest when no commit); number "M.m" or the next. */
-  async openLine(at, number = null) {
-    return (await call(http.post('/api/lifecycle/lines/open', { at, number }))).data;
+  /** Creates a release branch at a commit picked on `from` (main or a release branch); number "X.Y" or "X.Y.Z", or the suggested one. */
+  async openLine(at, number = null, from = null) {
+    return (await call(http.post('/api/lifecycle/lines/open', { at, number, from }))).data;
   },
-  /** The whole landing chain, computed; with apply (and nothing open, everything green) it lands. */
-  /** Carries a release line into every newer line and main, like a landing; with apply, lands it. */
+  /** The whole merge chain, computed; with apply (and nothing open, everything green) it merges. */
+  /** Merges a release branch into every newer release branch and main; with apply, moves them. */
   async carry(line, { resolutions = {}, tips = null, apply = false } = {}) {
     return (await call(http.post('/api/lifecycle/carry', { line, resolutions, tips, apply }))).data;
   },
@@ -234,7 +239,7 @@ export const api = {
     return (await call(http.post(`/api/lifecycle/land/${id}`, { resolutions, tips, apply }))).data;
   },
 
-  /** Brings a line, version or another space (any instance) into a space; with apply it moves the space. */
+  /** Merges a branch, a tag or another space (any instance) into a space; with apply it moves the space. */
   async pull(id, from, { resolutions = {}, head = null, apply = false } = {}) {
     return (await call(http.post(`/api/lifecycle/pull/${id}`, { from, resolutions, head, apply }))).data;
   },
@@ -251,6 +256,17 @@ export const api = {
   async commitTests(rev) {
     return (await call(http.post('/api/commit/tests', null, { params: { rev } }))).data;
   },
+  /**
+   * The commits that changed one thing, newest first: a domain, or in it a table (decision), a rule,
+   * a column, or one cell (rule and column). From a space (uncommitted first) or from a commit.
+   */
+  async elementHistory({ domain, ws = null, rev = null, decision = null, rule = null, column = null }) {
+    const params = { domain, ...(ws ? { ws } : { rev }) };
+    if (decision) params.decision = decision;
+    if (rule) params.rule = rule;
+    if (column) params.column = column;
+    return (await call(http.get('/api/history', { params }))).data;
+  },
 
   // --- other instances, through git -----------------------------------------------------------------
 
@@ -260,11 +276,11 @@ export const api = {
   async syncNow() {
     return (await call(http.post('/api/sync'))).data;
   },
-  /** Continues a space on this instance: it gets a checkout here, from its saved version. */
+  /** Continues a space on this instance: it gets a checkout here, from its last commit. */
   async openSpace(id) {
     return (await call(http.post(`/api/workspaces/${id}/open`))).data;
   },
-  /** Brings this checkout up to the space's newest saved version; unsaved changes are merged and kept. */
+  /** Pulls the space's newest commit into this checkout; uncommitted changes are merged and kept. */
   async refresh(id, { resolutions = {}, apply = false } = {}) {
     return (await call(http.post(`/api/lifecycle/refresh/${id}`, { resolutions, apply }))).data;
   },
@@ -277,5 +293,12 @@ export const api = {
 
   async evaluate(dmnXml, decision, inputs) {
     return (await call(http.post('/api/evaluate', { dmnXml, decision, inputs }))).data;
+  },
+
+  // --- the assistant ------------------------------------------------------------------------------
+
+  /** A question about the open screen: its facts, the conversation, the domain on screen (tables only), a task (review, commit_message). */
+  async assistant(page, context, messages, dmnXml = null, task = null, draft = null) {
+    return (await call(http.post('/api/assistant', { page, context, messages, dmnXml, task, draft }))).data;
   }
 };

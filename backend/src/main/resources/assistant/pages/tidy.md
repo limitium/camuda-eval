@@ -1,0 +1,1 @@
+**Clean up.** Clears away abandoned or old work spaces and release branches nobody needs, without losing work: work that was never merged is archived and can be restored. Choose items, then the **Tidy up** button. Items that need a decision first (for example uncommitted changes) are left alone and say why. **Archived work spaces** can be restored.

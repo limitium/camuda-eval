@@ -2,7 +2,7 @@
   <figure ref="figure" class="relative m-0 grid min-w-0 gap-3" :aria-label="caption">
     <figcaption v-if="caption" class="text-sm font-bold text-ink-2">{{ caption }}</figcaption>
 
-    <!-- The key: line bullets for main and the release lines, then the work spaces as branch services. -->
+    <!-- The key: bullets for main and the release branches, then the work spaces. -->
     <div class="flex flex-wrap items-center gap-1.5">
       <component
         :is="pickable.includes(l.id) ? 'button' : 'span'"
@@ -29,23 +29,23 @@
 
     <div class="grid grid-cols-[auto_minmax(0,1fr)] items-start overflow-x-auto border-y border-rule bg-ground py-1 pr-2" :style="{ '--row': `${ROW}px` }">
       <svg :width="width" :height="height" class="block" aria-hidden="true">
-        <!-- the routes: main and the lines heavy, work spaces as thinner branch services -->
-        <line v-for="l in lanes" :key="`rail-${l.id}`" :x1="x(l.id)" :x2="x(l.id)" :y1="railTop(l.id)" :y2="railBottom(l.id)"
+        <!-- the rails: main and the release branches heavy, work spaces thinner -->
+        <line v-for="l in railed" :key="`rail-${l.id}`" :x1="x(l.id)" :x2="x(l.id)" :y1="railTop(l.id)" :y2="railBottom(l.id)"
               :stroke="colour(l)" :stroke-width="laneWidth(l)" stroke-linecap="round" :opacity="dimmed(l.id) ? 0.22 : isRoute(l) ? 1 : 0.8" />
         <path v-for="e in edges" :key="e.key" :d="e.d" fill="none" :stroke="e.colour" :stroke-width="e.width" stroke-linecap="round" stroke-linejoin="round" :opacity="e.dim ? 0.22 : 0.95" />
-        <!-- lines opened with nothing on them yet: a short spur off the station they start at -->
+        <!-- release branches with nothing on them yet: a short spur off the commit they start at -->
         <path v-for="b in stubs" :key="`stub-${b.lane}`" :d="`M${x(b.from)},${b.y} L${x(b.lane)},${b.y}`" fill="none" :stroke="colourOf(b.lane)" stroke-width="4" stroke-linecap="round" />
         <circle v-for="b in stubs" :key="`stubdot-${b.lane}`" :cx="x(b.lane)" :cy="b.y" r="5" fill="var(--color-ground)" :stroke="colourOf(b.lane)" stroke-width="3" />
-        <!-- where it goes next: a dashed route, travelling -->
+        <!-- where it goes next: a dashed path, moving -->
         <path v-for="g in ghostEdges" :key="g.key" :d="g.d" fill="none" :stroke="ghostColour" stroke-width="3" stroke-dasharray="6 5" stroke-linecap="round" class="ghost-run" />
         <circle v-for="g in ghostDots" :key="`gd-${g.lane}`" :cx="x(g.lane)" :cy="g.y" r="7" fill="var(--color-ground)" :stroke="ghostColour" stroke-width="3" stroke-dasharray="4 3" />
         <!-- each row's whole width in the drawing answers hover, like its text does -->
         <rect v-for="(c, i) in rows" :key="`hit-${c.sha}`" x="0" :y="y(i) - ROW / 2" :width="width" :height="ROW" fill="transparent"
               @mouseenter="hover(c, i, $event)" @mouseleave="unhover" />
-        <!-- stations: a white tick on a route, an interchange ring where work joins, a dot on a branch service -->
+        <!-- commits: a white tick on main or a release branch, a ring on a merge, a dot on a work space -->
         <circle v-if="pickedRow >= 0" :cx="x(rows[pickedRow].lane)" :cy="y(pickedRow)" r="11" fill="none" stroke="var(--color-ink)" stroke-width="2.5" />
         <template v-for="(c, i) in rows" :key="c.sha">
-          <!-- a station on a route: the tick a metro map draws; versions and joins get the full ring -->
+          <!-- a plain commit on main or a release branch is a tick; tags and merges get the full ring -->
           <path v-if="isTick(c)" :d="`M${x(c.lane)},${y(i)} h8`" :stroke="colourOf(c.lane)" stroke-width="3.5" stroke-linecap="round" :opacity="dimmed(c.lane) ? 0.35 : 1" />
           <circle v-else :cx="x(c.lane)" :cy="y(i)" :r="stationR(c)"
                   :fill="stationFill(c)" :stroke="stationStroke(c)" :stroke-width="c.parents.length > 1 || c.versions?.length ? 3 : 2.5"
@@ -63,24 +63,29 @@
           class="flex h-[var(--row)] items-center gap-2 overflow-hidden rounded px-2 whitespace-nowrap"
           :class="[
             dimmed(c.lane) ? 'opacity-45' : '',
-            commitPickable || pickable.includes(c.lane) ? 'cursor-pointer hover:bg-hover' : '',
+            commitPickable || pickable.includes(c.lane) ? 'cursor-pointer hover:bg-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink' : '',
             hovered?.sha === c.sha ? 'bg-hover' : '',
             pickedCommit === c.sha ? '!bg-select font-bold' : '',
             isRouteId(c.lane) ? (c.parents.length > 1 || c.versions?.length ? 'font-bold text-ink' : 'font-semibold text-ink') : 'text-sm text-ink-2'
           ]"
+          :tabindex="commitPickable || pickable.includes(c.lane) ? 0 : undefined"
+          :role="commitPickable || pickable.includes(c.lane) ? 'button' : undefined"
+          :aria-pressed="commitPickable ? pickedCommit === c.sha : undefined"
           @click="clickRow(c)" @mouseenter="hover(c, i, $event)" @mouseleave="unhover"
+          @keydown.enter.prevent="clickRow(c)" @keydown.space.prevent="clickRow(c)"
+          @focus="hover(c, i, $event)" @blur="unhover"
         >
           <span class="min-w-0 truncate max-md:min-w-[9rem]" :class="marked.includes(c.lane) ? 'line-through decoration-needs' : ''">{{ plainMessage(c.message, mainBranch) }}</span>
           <span v-for="v in c.versions" :key="v.ref || v.name" class="tag flex-none max-md:hidden">{{ v.ref || v.name }}</span>
           <template v-for="t in tipsOf(c)" :key="t">
             <LineBullet v-if="isRouteId(t)" :line="t" :main-branch="mainBranch" size="sm" :title="laneName({ id: t })" />
-            <span v-else class="ref flex-none max-md:hidden" :style="{ '--ref': colourOf(t) }">{{ shortLane(t) }}</span>
+            <span v-else class="ref flex-none max-md:hidden" :style="{ '--ref': colourOf(t) }">{{ t }}</span>
           </template>
           <span class="ml-auto flex-none pl-3 text-xs text-ink-3 max-md:hidden">{{ c.author }} · {{ whenText(c.when) }}</span>
         </li>
       </ol>
     </div>
-    <!-- The commit under the pointer: its whole message, its line, and what it changed. -->
+    <!-- The commit under the pointer: its whole message, its branch, and what it changed. -->
     <div
       v-if="hovered"
       class="absolute inset-x-6 z-20 ml-auto grid max-w-[560px] gap-1.5 rounded border border-rule-strong bg-ground px-3.5 py-3 text-sm shadow-[0_10px_30px_-14px_oklch(20%_0.02_260/0.35)]"
@@ -101,7 +106,7 @@
       <ul v-else-if="detail.changes.length" class="m-0 grid list-none gap-0.5 border-t border-rule p-0 pt-1.5">
         <li v-for="d in detail.changes" :key="d.domain"><strong>{{ d.domain }}</strong> <span class="text-ink-2">{{ changeText(d) }}</span></li>
       </ul>
-      <p v-else class="border-t border-rule pt-1.5 text-ink-2">No rule or test changes{{ hovered.parents.length > 1 ? ' beyond what it brought together' : '' }}.</p>
+      <p v-else class="border-t border-rule pt-1.5 text-ink-2">No rule or test changes{{ hovered.parents.length > 1 ? ' beyond what it merged' : '' }}.</p>
     </div>
     <button v-if="hiddenCount" type="button" class="btn btn-quiet btn-small justify-self-start" @click="shown += 40">Show {{ Math.min(40, hiddenCount) }} older {{ Math.min(40, hiddenCount) === 1 ? 'commit' : 'commits' }} ({{ hiddenCount }} not shown)</button>
   </figure>
@@ -112,14 +117,14 @@ import { computed, ref } from 'vue';
 import LineBullet from './LineBullet.vue';
 import { api } from '../lib/api';
 import { routeColour } from '../lib/routes';
-import { branchName, plainMessage, whenText } from '../store';
+import { plainMessage, whenText } from '../store';
 
 /*
  * Lines and spaces as a git graph, newest at the top: one rail per lane, a dot per commit, an edge
- * to each parent — so a fork, a landing and a carry forward are visible as what they are.
+ * to each parent — so a fork, a merge and a carry forward are visible as what they are.
  *
  * Three uses: picking where to start (pickable lanes), seeing one space among its lines (focus), and
- * seeing where something goes next (ghost: dashed steps above the newest commits, e.g. a landing's
+ * seeing where something goes next (ghost: dashed steps above the newest commits, e.g. a merge's
  * chain or a new work space forking off the picked lane).
  */
 const props = defineProps({
@@ -154,11 +159,11 @@ const LEFT = 14;
 
 const known = computed(() => new Map(props.history.lanes.map((l) => [l.id, l])));
 // The same lanes in the same order on every screen, so a branch keeps its column and colour wherever
-// it is drawn: main, the newest release lines (and any older one a work space lands in), every work
+// it is drawn: main, the newest release lines (and any older one a work space merges into), every work
 // space — then a branch that does not exist yet (a new work space) in a column of its own.
 const lanes = computed(() => {
   const all = props.history.lanes;
-  // A branch with nothing in the window (closed or landed long ago) would only be an empty column,
+  // A branch with nothing in the window (closed or merged long ago) would only be an empty column,
   // unless this screen is about it.
   const inWindow = props.history.commits.slice(0, shown.value);
   const drawn = new Set(inWindow.flatMap((c) => [c.lane, ...(c.tips || []).filter((t) => t.startsWith('release/'))]));
@@ -172,6 +177,9 @@ const lanes = computed(() => {
   return ids.map((id) => known.value.get(id) || { id, kind: 'NEW' });
 });
 const column = computed(() => new Map(lanes.value.map((l, i) => [l.id, i])));
+// Only a lane with something on it gets a rail: an empty rail has zero length, and its round caps
+// would draw a stray dot at the bottom (a line just opened shows as a spur at its station instead).
+const railed = computed(() => lanes.value.filter((l) => rows.value.some((c) => c.lane === l.id) || props.ghost.some((g) => g.lane === l.id && !g.open)));
 // Narrower columns when there are many lanes, so the messages keep their room.
 const narrow = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches);
 if (typeof window !== 'undefined') window.matchMedia('(max-width: 760px)').addEventListener?.('change', (e) => { narrow.value = e.matches; });
@@ -195,7 +203,7 @@ const width = computed(() => LEFT * 2 + Math.max(0, lanes.value.length - 1) * CO
 const height = computed(() => top.value + rows.value.length * ROW + 8);
 
 // Routes: main and the release lines, each in its own colour. A work space is a branch service of
-// the line it lands in, so it runs in that line's colour, thinner.
+// the line it merges into, so it runs in that line's colour, thinner.
 const isRouteId = (id) => id === props.mainBranch || /^release\//.test(id || '');
 const isRoute = (l) => l.kind === 'MAIN' || l.kind === 'LINE' || isRouteId(l.id);
 function colour(l) {
@@ -209,7 +217,7 @@ function colour(l) {
 const colourOf = (lane) => colour(lanes.value.find((l) => l.id === lane) || known.value.get(lane) || { id: lane, kind: 'SPACE' });
 const ghostColour = computed(() => (props.ghost.length ? colourOf(props.ghost[props.ghost.length - 1].lane) : 'var(--color-ink)'));
 
-// The route a picked branch rides to main: a work space, the line it lands in, every newer line, main.
+// The route a picked branch rides to main: a work space, the line it merges into, every newer line, main.
 // Picking lights that whole route and dims the rest.
 function routeOf(id) {
   if (!id) return [];
@@ -229,7 +237,15 @@ const emphasised = computed(() => new Set([
 const dimmed = (lane) => emphasised.value.size > 0 && !emphasised.value.has(lane);
 const laneWidth = (l) => (isRoute(l) ? (emphasised.value.has(l.id) ? 5 : 4) : emphasised.value.has(l.id) ? 3 : 2);
 // Plain commits on a route are ticks; a join (interchange) or a version (a named station) is a ring.
-const isTick = (c) => isRouteId(c.lane) && c.parents.length < 2 && !c.versions?.length;
+// The end of a line (its first commit, or the oldest one drawn) is a ring too: a one-sided tick
+// at the end of a rail reads as a hook.
+const lastOnLane = computed(() => {
+  const last = new Map();
+  rows.value.forEach((c, i) => last.set(c.lane, i));
+  return last;
+});
+const isTick = (c) => isRouteId(c.lane) && c.parents.length === 1 && !c.versions?.length
+  && lastOnLane.value.get(c.lane) !== rowOf.value.get(c.sha);
 const stationR = (c) => (c.parents.length > 1 || c.versions?.length ? 6 : isRouteId(c.lane) ? 4.5 : 3.5);
 const stationFill = (c) => (c.parents.length > 1 || c.versions?.length || isRouteId(c.lane) ? 'var(--color-ground)' : colourOf(c.lane));
 const stationStroke = (c) => (c.parents.length > 1 ? 'var(--color-ink)' : colourOf(c.lane));
@@ -311,7 +327,9 @@ const ghostEdges = computed(() => props.ghost.map((g, i) => {
   let yFrom;
   if (i === 0) {
     // From one commit (g.at), or from the newest commit of the lane.
-    const r = g.at ? rows.value.findIndex((c) => c.sha === g.at) : rows.value.findIndex((c) => c.lane === g.from);
+    let r = g.at ? rows.value.findIndex((c) => c.sha === g.at) : rows.value.findIndex((c) => c.lane === g.from);
+    // A line with nothing of its own yet: its newest commit is the one it was opened at, where its spur is.
+    if (r < 0 && !g.at) r = rows.value.findIndex((c) => (c.tips || []).includes(g.from));
     yFrom = r < 0 ? height.value : y(r);
   } else {
     yFrom = (props.ghost.length - i) * ROW + ROW / 2;
@@ -371,13 +389,11 @@ function changeText(d) {
 }
 
 const tipsOf = (c) => (c.tips || []).filter((t) => column.value.has(t));
-const shortLane = (id) => (id === props.mainBranch ? 'main' : id.startsWith('release/') ? id.slice(8) : id.split('/').slice(1).join('/'));
+// Branches by their git names; only a work space still being named has none yet.
 const laneName = (l) => {
-  if (l.id === props.mainBranch) return 'main';
-  if (l.kind === 'NEW' && l.id.startsWith('release/')) return `Release ${l.id.slice(8)} (new)`;
-  if (l.kind === 'NEW' || l.id.endsWith('/…')) return l.id.endsWith('/…') ? 'new work space' : l.id;
-  const name = branchName(l.id, props.mainBranch);
-  return name.charAt(0).toUpperCase() + name.slice(1);
+  if (l.id.endsWith('/…')) return 'new work space';
+  if (l.kind === 'NEW' && l.id.startsWith('release/')) return `${l.id} (new)`;
+  return l.id;
 };
 </script>
 

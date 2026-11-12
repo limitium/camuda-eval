@@ -19,13 +19,13 @@
           </p>
           <p v-else-if="!atCommit" class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <template v-if="entry.release">
-              <span class="inline-flex items-center gap-1.5 font-semibold"><LineBullet :line="entry.line" :main-branch="app.info.mainBranch" size="sm" />Release {{ entry.line.slice(8) }}</span>
+              <span class="inline-flex items-center gap-1.5 font-semibold"><LineBullet :line="entry.line" :main-branch="app.info.mainBranch" size="sm" />{{ entry.line }}</span>
               <span class="tag">{{ entry.release }}</span>
             </template>
             <template v-else>
               <span class="state state-live">Draft</span>
-              <span>{{ entry.owner === app.info.user ? 'your' : `${entry.owner}’s` }} {{ entry.workspace.split('/').slice(2).join('/') }}</span>
-              <span class="meta inline-flex items-center gap-1.5">built on {{ builtOn }} · lands in <LineBullet :line="entry.line" :main-branch="app.info.mainBranch" size="sm" />{{ lineName(entry.line, app.info.mainBranch) }}</span>
+              <span>{{ entry.workspace }}</span>
+              <span class="meta inline-flex items-center gap-1.5">built on {{ builtOn }} · merges into <LineBullet :line="entry.line" :main-branch="app.info.mainBranch" size="sm" />{{ lineName(entry.line, app.info.mainBranch) }}</span>
             </template>
             <span class="meta">· {{ entry.release ? 'deployed' : 'published' }} by {{ entry.publishedBy }} <span class="text-xs text-ink-3">{{ whenText(entry.publishedAt) }}</span> ·</span>
             <router-link :to="`/commit/${entry.commit}`" class="mono text-sm">{{ entry.commit.slice(0, 7) }}</router-link>
@@ -37,7 +37,7 @@
         >
           <template v-if="edits.count || testsEdited">
             <span class="state state-edit">{{ changeText }}</span>
-            Only here, for trying. Nothing is saved{{ atCommit ? '; the version is unchanged' : `, and ${app.info.env} still runs the original` }}.
+            Only here, for trying. Nothing is saved{{ atCommit ? '; the commit is unchanged' : `, and ${app.info.env} still runs the original` }}.
           </template>
           <template v-else-if="locked">This instance only deploys: look at the tables, run the tests and try values. Nothing here can be changed.</template>
           <template v-else>Change anything to try it: nothing here is saved or shipped.</template>
@@ -81,6 +81,7 @@
         :blocks="blocks"
         :saved-blocks="shippedBlocks"
         :results="verdict?.tests || null"
+        :stale="!!verdict?.stale"
         :problems="[]"
         @edit-tests="editTests"
       />
@@ -89,12 +90,20 @@
       <section v-else-if="decision" class="decision grid gap-6">
         <p v-if="!decision.tabular" class="notice">{{ decision.name }} is a single expression, not a table.</p>
         <template v-else>
+          <div v-if="historyRev" class="-mb-3 flex justify-end">
+            <button type="button" class="btn btn-small" :aria-pressed="historyOpen" aria-controls="history-title" @click="toggleHistory"><History aria-hidden="true" /> History</button>
+          </div>
+          <!-- With the history open, it sits beside the grid; a cell picked in the grid is offered to it, not read. -->
+          <div :class="historyOpen ? 'grid grid-cols-[minmax(0,1fr)_minmax(300px,400px)] items-start gap-5 @max-[1180px]:grid-cols-1' : 'contents'">
           <RuleGrid
             :decision="decision"
             :readonly="locked"
+            :selectable="locked && historyOpen"
+            :selected="historyOpen ? historyTarget : null"
             :cell-states="edits.cells"
             :column-states="edits.columns"
             :row-states="rowMarks"
+            @select="onPick"
             @cell="(r, side, c, v) => edit(() => doc.setCell(decision.id, r, side, c, v))"
             @description="(r, v) => edit(() => doc.setDescription(decision.id, r, v))"
             @add-rule="(after) => edit(() => doc.addRule(decision.id, after))"
@@ -104,6 +113,18 @@
             @add-column="(side) => edit(() => (side === 'in' ? doc.addInput(decision.id, { expression: 'input', typeRef: 'string' }) : doc.addOutput(decision.id, { name: 'result', typeRef: 'string' })))"
             @remove-column="(side, i) => edit(() => doc.removeColumn(decision.id, side, i))"
           />
+          <HistoryPanel
+            v-if="historyOpen"
+            class="sticky top-4 max-h-[calc(100vh-150px)] overflow-auto @max-[1180px]:static @max-[1180px]:max-h-none"
+            :domain="name"
+            :rev="historyRev"
+            :decision="decision"
+            :selection="pick"
+            :unsaved="tabEdited(decision) ? 'Changes made here are only for trying; they are not part of the history.' : null"
+            @target="(t) => (historyTarget = t)"
+            @close="historyOpen = false"
+          />
+          </div>
 
           <EvaluatePanel
             :decisions="decisions"
@@ -122,6 +143,7 @@
             :blocks="blocks"
             :saved-blocks="shippedBlocks"
             :results="verdict?.tests || null"
+        :stale="!!verdict?.stale"
             :problems="[]"
             :ends="[decision.id]"
             @edit-tests="editTests"
@@ -133,9 +155,9 @@
 </template>
 
 <script setup>
-import { computed, markRaw, onMounted, ref, shallowRef } from 'vue';
+import { computed, markRaw, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Workflow } from 'lucide-vue-next';
+import { History, Workflow } from 'lucide-vue-next';
 import EvaluatePanel from '../components/EvaluatePanel.vue';
 import TestSets from '../components/TestSets.vue';
 import RelationsView from '../components/RelationsView.vue';
@@ -147,6 +169,7 @@ import { DmnDocument, chainEnds, chainNoteFor, chainOutputsOf, editStates, relat
 import { blockFor, parseSpec, serializeSpec, testEdits } from '../lib/testSpec';
 import { expectationColumn } from '../lib/testSpec';
 import { app, lineName, plainMessage, spacePath, whenText } from '../store';
+import HistoryPanel from '../components/HistoryPanel.vue';
 
 /*
  * A domain exactly as it runs (/running/:name) or exactly as it was at any commit
@@ -192,6 +215,20 @@ const changeText = computed(() => {
   return parts.join(', ');
 });
 const decision = computed(() => decisions.value.find((d) => d.id === tab.value) || null);
+
+// --- history up to this commit: of the domain, a table, a rule, a column or one cell -------------
+const historyRev = computed(() => (atCommit ? entry.value?.sha : entry.value?.commit) || null);
+// Opened only on request; picking a cell offers it to the panel, which reads only what it is asked for.
+const historyOpen = ref(false);
+const historyTarget = ref(null);
+const pick = ref(null);
+function toggleHistory() {
+  historyOpen.value = !historyOpen.value;
+}
+function onPick(ruleId, columnId) {
+  pick.value = { ruleId, columnId };
+}
+watch(tab, () => { pick.value = null; });
 const block = computed(() => {
   const d = decision.value;
   return d ? blocks.value.find((b) => b.decision === d.id) || blocks.value.find((b) => b.decision === d.name) || null : null;
@@ -237,7 +274,7 @@ function edit(change, note) {
     app.say(error.message, 'needs');
     return;
   }
-  verdict.value = null;
+  if (verdict.value) verdict.value = { ...verdict.value, stale: true };
   const { added, removed } = doc.value.syncRequirements();
   reread();
   if (note) app.say(note);
@@ -286,7 +323,7 @@ function disconnect(to, via) {
 
 function editTests(change) {
   change();
-  verdict.value = null;
+  if (verdict.value) verdict.value = { ...verdict.value, stale: true };
 }
 
 function createBlock() {
@@ -298,7 +335,7 @@ function reset() {
   doc.value = markRaw(new DmnDocument(original.value.dmn));
   blocks.value = parseSpec(original.value.yaml);
   answer.value = null;
-  verdict.value = null;
+  if (verdict.value) verdict.value = { ...verdict.value, stale: true };
   reread();
   app.say(`Back to ${name} exactly ${asWhat}.`);
 }
@@ -311,7 +348,7 @@ async function load() {
       table = domain;
       entry.value = info;
     } else {
-      throw new Error('open a domain from a version: /commit/<sha>/<file>');
+      throw new Error('open a domain from a commit: /commit/<sha>/<file>');
     }
     original.value = { dmn: table.dmn || '', yaml: table.yaml || '' };
     doc.value = markRaw(new DmnDocument(original.value.dmn));
@@ -343,7 +380,7 @@ async function runTests() {
 
 /*
  * Turning a try into work: a work space built on exactly what runs — a fix to the release, or new work on
- * the draft's version — holding these changes, unsaved, ready to be tested and saved properly.
+ * the draft's version — holding these changes, uncommitted, ready to be tested and committed properly.
  */
 async function startSpace() {
   starting.value = true;
@@ -354,10 +391,10 @@ async function startSpace() {
     const [dmn, tests] = await Promise.all([api.readDmn(created.id, name), api.readTests(created.id, name)]);
     await api.writeDmn(created.id, name, doc.value.serialize(), dmn.etag);
     if (testsEdited.value) await api.writeTests(created.id, name, serializeSpec(blocks.value), tests.etag);
-    app.say(`Started ${created.name} on ${baseline.length === 40 ? baseline.slice(0, 7) : baseline}, with your changes in it. Test them and save a version when ready.`, 'clean');
+    app.say(`Started ${created.name} on ${baseline.length === 40 ? baseline.slice(0, 7) : baseline}, with your changes in it. Test them and commit them when ready.`, 'clean');
     router.push(spacePath(created.id, `/table/${name}`));
   } catch (error) {
-    app.say(`No space was started: ${error.message}. Your changes are still here.`, 'needs');
+    app.say(`No work space was started: ${error.message}. Your changes are still here.`, 'needs');
   } finally {
     starting.value = false;
   }

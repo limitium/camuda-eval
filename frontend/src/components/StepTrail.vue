@@ -1,5 +1,5 @@
 <template>
-  <!-- The journey as a ride along the space's own route: each step a station, the next one an interchange ring. -->
+  <!-- The work space's steps in order, in the colour of the branch it merges into; the next step a ring. -->
   <nav class="flex h-[var(--trail)] items-center justify-between gap-6 overflow-x-auto border-b border-rule bg-ground px-[var(--gutter)] max-md:pr-10 max-md:[mask-image:linear-gradient(to_right,black_80%,transparent)]" aria-label="Steps">
     <ol class="m-0 flex flex-none list-none items-center p-0" :style="{ '--route': colour }">
       <li v-for="(step, i) in space.steps" :key="step.key" class="flex items-center">
@@ -35,7 +35,7 @@
         </router-link>
       </li>
     </ol>
-    <p v-if="space.info" class="hidden flex-none items-center gap-2 text-sm text-ink-2 md:flex">
+    <p v-if="space.info" class="hidden flex-none items-center gap-2 text-sm text-ink-2 lg:flex">
       <LineBullet :line="space.info.targetLine" :main-branch="app.info.mainBranch" size="sm" />
       {{ purposeOf(space.info, app.info.mainBranch) }}
     </p>

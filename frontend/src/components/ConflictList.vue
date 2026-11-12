@@ -1,7 +1,7 @@
 <template>
   <section class="conflicts grid content-start gap-3" aria-label="Conflicts">
     <header class="grid gap-2.5">
-      <h3>{{ remaining ? `${remaining} of ${conflicts.length} need you` : `All ${conflicts.length} answered` }}</h3>
+      <h3>{{ remaining ? `${remaining} of ${conflicts.length} ${conflicts.length === 1 ? 'conflict needs' : 'conflicts need'} you` : `All ${conflicts.length} ${conflicts.length === 1 ? 'conflict' : 'conflicts'} answered` }}</h3>
       <div class="flex flex-wrap gap-1.5">
         <button v-if="cosmetic.length" type="button" class="btn btn-small" @click="takeCosmetic">{{ cosmeticLabel }} ({{ cosmetic.length }})</button>
         <button type="button" class="btn btn-small btn-quiet" @click="takeAll('OURS')">{{ allOursLabel }}</button>
@@ -73,7 +73,7 @@ const props = defineProps({
   resolutions: { type: Object, required: true },
   focused: { type: String, default: null },
   theirName: { type: String, default: 'them' },
-  // Optional grouping, e.g. by the step of a landing chain ("1.4 → 1.5"). Defaults to one group.
+  // Optional grouping, e.g. by the step of a merge chain ("1.4 → 1.5"). Defaults to one group.
   groupOf: { type: Function, default: null },
   // Names for the two sides of a conflict, e.g. { OURS: 'Release 1.5', THEIRS: 'Your work space' }.
   sidesOf: { type: Function, default: null },

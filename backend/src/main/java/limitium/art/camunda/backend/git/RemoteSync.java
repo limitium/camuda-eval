@@ -253,7 +253,7 @@ public class RemoteSync {
                             store.clearNotSent(ref);
                         }
                     } else {
-                        String why = "this instance and another both moved this line; both are kept, and they need joining";
+                        String why = "this instance and another both moved this branch; both are kept, and they need merging";
                         report.diverged.put(name, why);
                         store.markNotSent(ref, why);
                     }

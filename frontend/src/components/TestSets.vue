@@ -9,18 +9,19 @@
       <div v-for="s in sets" :key="s.key" class="set" :class="{ open: openKey === s.key }">
         <button
           type="button"
-          class="set-row grid min-h-12 w-full grid-cols-[16px_minmax(0,1fr)_auto_5rem_7rem] items-center gap-3.5 px-1.5 py-3 text-left hover:bg-hover max-[760px]:grid-cols-[16px_1fr_auto]"
+          class="set-row grid min-h-12 w-full grid-cols-[16px_minmax(0,1fr)_auto_5rem_minmax(7rem,auto)] items-center gap-3.5 px-1.5 py-3 text-left hover:bg-hover @max-[760px]:grid-cols-[16px_1fr_auto]"
           :aria-expanded="openKey === s.key"
           @click="openKey = openKey === s.key ? null : s.key"
         >
           <ChevronRight :size="16" :stroke-width="1.75" class="text-ink-3 transition-[rotate] duration-160 ease-out" :class="openKey === s.key ? 'rotate-90' : ''" aria-hidden="true" />
           <span class="truncate font-semibold">{{ s.label }}</span>
-          <span class="meta max-[760px]:hidden">{{ s.block.rows.length }} {{ s.block.rows.length === 1 ? 'case' : 'cases' }}</span>
-          <span v-if="s.edited" class="state state-edit max-[760px]:hidden">changed</span>
-          <span v-else class="max-[760px]:hidden"></span>
-          <span class="justify-self-end">
+          <span class="meta @max-[760px]:hidden">{{ s.block.rows.length }} {{ s.block.rows.length === 1 ? 'case' : 'cases' }}</span>
+          <span v-if="s.edited" class="state state-edit @max-[760px]:hidden">changed</span>
+          <span v-else class="@max-[760px]:hidden"></span>
+          <span class="justify-self-end whitespace-nowrap">
             <span v-if="!s.results" class="state state-quiet">not run</span>
-            <span v-else-if="s.failed" class="state state-needs">{{ s.failed }} failing</span>
+            <span v-else-if="s.failed" class="state state-needs">{{ s.failed }} failing{{ stale ? ' at the last run' : '' }}</span>
+            <span v-else-if="stale" class="state state-quiet">passed at the last run</span>
             <span v-else class="state state-clean">all pass</span>
           </span>
         </button>
@@ -33,6 +34,7 @@
             :hint="{ suppliedVariables: s.scope.needed, outputs: s.scope.end.outputs.map((o) => o.name) }"
             :problems="problemsFor(s)"
             :results="results"
+            :stale="stale"
             :name-prefix="s.namePrefix"
             :chain-from="s.chainFrom"
             :cell-states="s.changes.cells"
@@ -100,6 +102,8 @@ const props = defineProps({
   blocks: { type: Array, required: true },
   savedBlocks: { type: Array, default: () => [] },
   results: { type: Array, default: null },
+  // The results are from a run before the latest changes: still shown, said to be from then.
+  stale: { type: Boolean, default: false },
   problems: { type: Array, default: () => [] },
   // Only the sets of these tables; null for every table in the file.
   ends: { type: Array, default: null },
@@ -231,6 +235,7 @@ function handlersFor(s) {
   return {
     cell: (r, c, v) => edit(() => { b.rows[r][c] = v; }),
     'add-row': () => edit(() => b.rows.push(b.columns.map(() => ''))),
+    'copy-row': (r) => edit(() => b.rows.splice(r + 1, 0, [...b.rows[r]])),
     'remove-row': (r) => edit(() => b.rows.splice(r, 1)),
     'add-column': (col) => edit(() => {
       if (b.columns.includes(col)) return;

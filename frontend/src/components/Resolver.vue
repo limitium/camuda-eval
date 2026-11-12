@@ -1,5 +1,5 @@
 <template>
-  <div class="resolver grid grid-cols-[minmax(300px,420px)_minmax(0,1fr)] items-start gap-8 max-[960px]:grid-cols-1">
+  <div class="resolver grid grid-cols-[minmax(300px,420px)_minmax(0,1fr)] items-start gap-8 @max-[960px]:grid-cols-1">
     <ConflictList
       class="list"
       :conflicts="conflicts"
@@ -7,20 +7,20 @@
       :focused="focused"
       :group-of="groupOf"
       :sides-of="sidesOf"
-      :all-ours-label="oursAll || 'Keep every line’s'"
+      :all-ours-label="oursAll || 'Keep each target branch’s'"
       :all-theirs-label="theirsAll || `Take all of ${spaceName}`"
       :cosmetic-label="`Take ${theirsName || spaceName}’s wording`"
       @choose="(id, key) => $emit('choose', id, key)"
       @focus="(id) => (focused = id)"
     />
 
-    <section class="sticky top-4 grid min-w-0 gap-3 max-[960px]:static" aria-live="polite">
+    <section class="sticky top-4 grid min-w-0 gap-3 @max-[960px]:static" aria-live="polite">
       <template v-if="current">
         <p class="flex flex-wrap items-center gap-1.5 text-xs text-ink-2">
           <LineBullet v-if="isLine(current.hop)" :line="current.hop" :main-branch="mainBranch" size="sm" />
           <span class="font-semibold text-ink">{{ placeName(current.hop) }}</span>
           <span>· {{ current.domain }}</span>
-          <span v-if="hopOf(current)?.provisional">· shown as it would be with the earlier steps’ open answers kept as the line’s</span>
+          <span v-if="hopOf(current)?.provisional">· shown as it would be with the earlier merges’ open answers kept as the target branch’s</span>
         </p>
         <h3>{{ current.label }}</h3>
 
@@ -50,15 +50,15 @@
         </template>
 
         <div class="grid gap-1.5 border-t border-rule pt-3">
-          <div v-if="current.ours != null" class="grid grid-cols-[12rem_minmax(0,1fr)] items-baseline gap-3 max-[960px]:grid-cols-1 max-[960px]:gap-0.5">
+          <div v-if="current.ours != null" class="grid grid-cols-[12rem_minmax(0,1fr)] items-baseline gap-3 @max-[960px]:grid-cols-1 @max-[960px]:gap-0.5">
             <span class="meta">{{ sidesOf(current).OURS }}</span>
             <span class="font-mono text-[0.8125rem] [overflow-wrap:anywhere]">{{ current.ours }}</span>
           </div>
-          <div v-if="current.theirs != null" class="grid grid-cols-[12rem_minmax(0,1fr)] items-baseline gap-3 max-[960px]:grid-cols-1 max-[960px]:gap-0.5">
+          <div v-if="current.theirs != null" class="grid grid-cols-[12rem_minmax(0,1fr)] items-baseline gap-3 @max-[960px]:grid-cols-1 @max-[960px]:gap-0.5">
             <span class="meta">{{ sidesOf(current).THEIRS }}</span>
             <span class="font-mono text-[0.8125rem] [overflow-wrap:anywhere]">{{ current.theirs }}</span>
           </div>
-          <div v-if="current.base != null" class="grid grid-cols-[12rem_minmax(0,1fr)] items-baseline gap-3 max-[960px]:grid-cols-1 max-[960px]:gap-0.5">
+          <div v-if="current.base != null" class="grid grid-cols-[12rem_minmax(0,1fr)] items-baseline gap-3 @max-[960px]:grid-cols-1 @max-[960px]:gap-0.5">
             <span class="meta">Before either changed it</span>
             <span class="font-mono text-[0.8125rem] text-ink-2 [overflow-wrap:anywhere]">{{ current.base }}</span>
           </div>
@@ -76,10 +76,9 @@ import LineBullet from './LineBullet.vue';
 import RuleGrid from './RuleGrid.vue';
 import { DmnDocument } from '../lib/dmnModel';
 import { parseSpec } from '../lib/testSpec';
-import { branchName } from '../store';
 
 /*
- * Every conflict of a landing, across every step of the chain, beside the place it is about. The
+ * Every conflict of a merge, across every step of the chain, beside the place it is about. The
  * answers are data: each conflict brings its own choices, so nothing here switches on the kind.
  */
 const props = defineProps({
@@ -87,7 +86,7 @@ const props = defineProps({
   resolutions: { type: Object, required: true },
   mainBranch: { type: String, default: 'main' },
   spaceName: { type: String, default: 'your work space' },
-  // Bulk answers named for the context (landing by default).
+  // Bulk answers named for the context (merging by default).
   oursAll: { type: String, default: null },
   theirsAll: { type: String, default: null },
   theirsName: { type: String, default: null }
@@ -103,9 +102,10 @@ watch(conflicts, (list) => {
 const current = computed(() => conflicts.value.find((c) => c.id === focused.value) || null);
 const isLine = (b) => b === props.mainBranch || /^release\//.test(b || '');
 const hopOf = (c) => props.result.hops.find((h) => h.into === c.hop);
-const capital = (s) => (/^(main|master|release\/|feature\/|hotfix\/)/.test(s) ? s : s.charAt(0).toUpperCase() + s.slice(1));
+// Prose ("your pricing") starts a label with a capital; a git name (release/1.0, v1.0.0) stays as git has it.
+const capital = (s) => (/\s/.test(s) ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 const possessive = (s) => (s.endsWith('s') ? `${s}’` : `${s}’s`);
-const placeName = (branch) => (branch === props.result.space ? props.spaceName : branchName(branch, props.mainBranch));
+const placeName = (branch) => (branch === props.result.space ? props.spaceName : branch);
 // Each side is named by the commit that made its value; the place is only a fallback.
 const commitName = (a) => (a ? `${a.author}: “${a.message}”` : null);
 const sidesOf = (c) => {

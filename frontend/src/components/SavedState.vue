@@ -7,15 +7,15 @@
   >
     <template v-if="state === 'BEHIND' || state === 'BEHIND_UNSAVED'">
       <p class="flex-[1_1_40ch]">
-        <strong>A newer version of this work space was saved</strong> by {{ saved.savedBy }}{{ saved.savedOn ? ` on ${saved.savedOn}` : '' }} {{ whenText(saved.savedAt) }} — “{{ saved.savedMessage }}”.
-        <template v-if="state === 'BEHIND_UNSAVED'">Your unsaved changes here are merged over it when you refresh, and stay unsaved.</template>
-        <template v-else>Refresh to continue from it.</template>
+        <strong>Newer changes to this work space were committed</strong> by {{ saved.savedBy }}{{ saved.savedOn ? ` on ${saved.savedOn}` : '' }} {{ whenText(saved.savedAt) }} — “{{ saved.savedMessage }}”.
+        <template v-if="state === 'BEHIND_UNSAVED'">Your uncommitted changes here are merged over them when you pull, and stay uncommitted.</template>
+        <template v-else>Pull to continue from them.</template>
       </p>
-      <button type="button" class="btn btn-small" :aria-busy="busy" :disabled="busy" @click="refresh">{{ busy ? 'Refreshing…' : 'Refresh' }}</button>
+      <button type="button" class="btn btn-small" :aria-busy="busy" :disabled="busy" @click="refresh">{{ busy ? 'Pulling…' : 'Pull' }}</button>
     </template>
     <p v-else class="flex-[1_1_40ch] text-sm text-ink-2">
-      <span :class="state === 'UNSAVED' ? 'state state-edit' : 'state state-clean'">{{ state === 'UNSAVED' ? 'Unsaved changes here.' : 'Saved.' }}</span>
-      Last saved by {{ saved.savedBy }}{{ saved.savedOn ? ` on ${saved.savedOn}` : '' }} {{ whenText(saved.savedAt) }}. A work space has one saved version, shared by every instance.
+      <span :class="state === 'UNSAVED' ? 'state state-edit' : 'state state-clean'">{{ state === 'UNSAVED' ? 'Uncommitted changes here.' : 'Committed.' }}</span>
+      Last committed by {{ saved.savedBy }}{{ saved.savedOn ? ` on ${saved.savedOn}` : '' }} {{ whenText(saved.savedAt) }}. A work space’s commits are shared by every instance.
     </p>
   </div>
 </template>
@@ -28,8 +28,8 @@ import { space } from '../lib/space';
 import { app, spacePath, whenText } from '../store';
 
 /*
- * Where this checkout stands against the work space's one saved version (its branch): saved, unsaved
- * changes here, or behind a version saved elsewhere — with the way back in step.
+ * Where this checkout stands against the work space's commits (its branch): committed, uncommitted
+ * changes here, or behind a commit made elsewhere — with the way back in step.
  */
 const props = defineProps({ spaceId: { type: String, required: true } });
 const router = useRouter();
@@ -46,11 +46,11 @@ async function refresh() {
   busy.value = true;
   try {
     const r = await api.refresh(props.spaceId, { apply: true });
-    if (r.status === 'REFRESHED' || r.status === 'UP_TO_DATE') app.say('This work space is at its newest saved version.', 'clean');
+    if (r.status === 'REFRESHED' || r.status === 'UP_TO_DATE') app.say('This work space is at its newest commit.', 'clean');
     else app.say(r.message || 'Look again.', 'needs');
     await space.open(props.spaceId);
   } catch (error) {
-    app.say(`Not refreshed: ${error.message}`, 'needs');
+    app.say(`Not pulled: ${error.message}`, 'needs');
   } finally {
     busy.value = false;
   }

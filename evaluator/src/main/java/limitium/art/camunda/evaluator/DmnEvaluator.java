@@ -63,6 +63,11 @@ public class DmnEvaluator {
             this.dmnEvaluator = dmnEvaluator;
         }
 
+        /** The decision's name as its table shows it, or its id when it has none. */
+        public String name() {
+            return dmnDecision.getName() != null && !dmnDecision.getName().trim().isEmpty() ? dmnDecision.getName() : dmnDecision.getKey();
+        }
+
         public DmnDecisionResult evaluate(VariableMap vars) {
             try {
                 dmnEvaluator.listener.clearEvents();

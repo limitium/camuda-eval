@@ -88,7 +88,7 @@
 
     <section v-for="c in (readonly ? [] : relations.clashes)" :key="c.name" class="grid max-w-[900px] gap-2 rounded border border-[oklch(85%_0.06_25)] bg-needs-tint px-3.5 py-3">
       <p class="state state-needs">
-        {{ c.ids.map(nameOf).join(', ').replace(/, ([^,]*)$/, ' and $1') }} {{ c.ids.length === 2 ? 'both' : 'all' }} give <span class="mono">{{ c.name }}</span>. A table checking {{ c.name }} can only use one of them — {{ nameOf(c.ids[0]) }}’s. Give the others their own names:
+        {{ c.ids.map(nameOf).join(', ').replace(/, ([^,]*)$/, ' and $1') }} {{ c.ids.length === 2 ? 'both' : 'all' }} give <span class="var">{{ c.name }}</span>. A table checking {{ c.name }} can only use one of them — {{ nameOf(c.ids[0]) }}’s. Give the others their own names:
       </p>
       <form v-for="id in c.ids.slice(1)" :key="id" class="flex flex-wrap items-center gap-2.5" @submit.prevent="rename(id, c.name)">
         <label class="label !m-0 min-w-[120px]" :for="`rn-${id}`">{{ nameOf(id) }} gives</label>
@@ -108,8 +108,8 @@
             :class="confirming === `${l.to}|${v}` ? 'bg-needs-tint' : ''"
           >
             <span class="inline-flex items-center gap-2"><strong class="font-semibold">{{ nameOf(l.from) }}</strong><ArrowRight class="flex-none text-ink-3" :size="16" :stroke-width="1.75" aria-label="feeds" /><strong class="font-semibold">{{ nameOf(l.to) }}</strong></span>
-            <span v-if="confirming !== `${l.to}|${v}`" class="meta">{{ nameOf(l.to) }} checks <span class="mono">{{ v }}</span>, which {{ nameOf(l.from) }} gives</span>
-            <span v-else class="state state-needs">Removes {{ nameOf(l.to) }}’s condition checking {{ v }}{{ entriesText(l.to, v) }}.</span>
+            <span v-if="confirming !== `${l.to}|${v}`" class="meta">{{ nameOf(l.to) }} checks <span class="var">{{ v }}</span>, which {{ nameOf(l.from) }} gives</span>
+            <span v-else class="state state-needs">Removes {{ nameOf(l.to) }}’s condition checking <span class="var">{{ v }}</span>{{ entriesText(l.to, v) }}.</span>
             <span v-if="!readonly" class="flex gap-1.5">
               <button v-if="confirming !== `${l.to}|${v}`" type="button" class="btn btn-small btn-quiet" @click="confirming = `${l.to}|${v}`">Disconnect</button>
               <template v-else>

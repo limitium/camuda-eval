@@ -46,3 +46,7 @@ frontend/node_modules
 /.impeccable/review/
 /.impeccable/questions/
 /.impeccable/hook.cache.json
+
+# e2e run: dependencies and screenshots
+e2e/node_modules
+e2e/out

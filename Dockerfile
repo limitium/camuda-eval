@@ -12,6 +12,8 @@ FROM eclipse-temurin:17-jdk AS backend
 WORKDIR /src
 COPY gradlew settings.gradle build.gradle ./
 COPY gradle gradle
+# the wrapper's download in a layer of its own, so a change to the sources does not fetch it again
+RUN ./gradlew --version --no-daemon -q > /dev/null
 COPY evaluator evaluator
 COPY evaluator-test evaluator-test
 COPY backend/build.gradle backend/build.gradle

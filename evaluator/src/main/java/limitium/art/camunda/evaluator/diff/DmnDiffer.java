@@ -174,6 +174,8 @@ public final class DmnDiffer {
         int[] leftMatch = matchColumns(left, right, output);
         int[] rightMatch = invert(leftMatch, right.size());
         List<int[]> order = mergeOrder(leftMatch, rightMatch, left.size(), right.size());
+        int[] leftRank = ranks(leftMatch);
+        int[] rightRank = ranks(rightMatch);
 
         List<ColumnDiff> columns = new ArrayList<ColumnDiff>();
         int[] leftToMerged = filled(left.size());
@@ -313,6 +315,8 @@ public final class DmnDiffer {
 
         int[] rightMatch = invert(leftMatch, right.size());
         List<int[]> order = mergeOrder(leftMatch, rightMatch, left.size(), right.size());
+        int[] leftRank = ranks(leftMatch);
+        int[] rightRank = ranks(rightMatch);
 
         List<RuleDiff> rules = new ArrayList<RuleDiff>();
         for (int position = 0; position < order.size(); position++) {
@@ -329,7 +333,7 @@ public final class DmnDiffer {
                 change = ChangeType.REMOVED;
                 summary.rulesRemoved++;
             } else {
-                change = classifyPair(l, r, li, ri, inputs, outputs);
+                change = classifyPair(l, r, leftRank[li], rightRank[ri], inputs, outputs);
                 if (change == ChangeType.CHANGED) {
                     summary.rulesChanged++;
                 } else if (change == ChangeType.MOVED) {
@@ -483,8 +487,22 @@ public final class DmnDiffer {
         return (double) equal / (double) total;
     }
 
+    /**
+     * Each matched rule's place among the rules both sides have, by its index on one side; -1 for a
+     * rule the other side does not have. A rule pushed down by one added above it keeps its place
+     * here, so only a rule whose order among the others changed is MOVED.
+     */
+    private static int[] ranks(int[] match) {
+        int[] rank = new int[match.length];
+        int next = 0;
+        for (int i = 0; i < match.length; i++) {
+            rank[i] = match[i] >= 0 ? next++ : -1;
+        }
+        return rank;
+    }
+
     private static ChangeType classifyPair(DecisionTableReader.Rule left, DecisionTableReader.Rule right,
-                                           int leftIndex, int rightIndex,
+                                           int leftRank, int rightRank,
                                            Alignment inputs, Alignment outputs) {
         for (int m = 0; m < inputs.columns.size(); m++) {
             if (!equalsNormalized(cell(left, inputs, m, true, true), cell(right, inputs, m, false, true))) {
@@ -500,7 +518,7 @@ public final class DmnDiffer {
             return ChangeType.CHANGED;
         }
         // Order is semantic under FIRST and PRIORITY, so a pure move is still worth reporting.
-        return leftIndex == rightIndex ? ChangeType.UNCHANGED : ChangeType.MOVED;
+        return leftRank == rightRank ? ChangeType.UNCHANGED : ChangeType.MOVED;
     }
 
     private static RuleDiff buildRuleDiff(DecisionTableReader.Rule left, DecisionTableReader.Rule right,

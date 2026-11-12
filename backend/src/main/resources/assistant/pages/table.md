@@ -1,0 +1,10 @@
+**A domain's tables, in a work space** — where rules and test cases are changed.
+
+- The tabs at the top are the domain's tables, plus **How they connect** (which table checks which table's result, and trying the whole chain). **+ Table** adds a table.
+- On a table's tab: its name, **When several rules match** (the hit policy), **DMN syntax** (a cheat sheet for writing cells), then the rules grid: conditions on the left, results on the right, one rule per row, numbered. Clicking a cell edits it. Hovering a rule shows its buttons at the end of its row: **Insert a rule below**, **Move up**, **Move down**, **Remove rule** (removes it at once, without asking; nothing is lost until **Save**). **Add a rule**, under the grid, adds one at the end.
+- **History** (next to DMN syntax) opens the history beside the grid: the commits that changed what is followed, newest first, each with who, when and the value before and after. Opened, it shows the cell picked in the grid (the table, with none picked); after that it reads only when asked — five buttons say how much: **Cell** (the picked cell), **Rule**, **Column**, **Table**, **Domain** (every table and the tests), and **Show the history of …** offers a cell picked since. Clicking cells to edit them does not change it. Saved but uncommitted changes come first as **Not committed**; changes not saved yet are not in it. A merge that only brought a change in is not listed: the commit that made the change is.
+- **Try it**: fill in values and see which rule matches and what the table gives — nothing is saved.
+- **Test sets** and **Test cases**: rows with a scenario, the values supplied and the results expected; **Add a case** adds a row, **Run the tests** at the bottom runs them on what is on screen.
+- Everything changed and not yet saved is shown in blue. **Save** (bottom right, or Ctrl/Cmd+S) keeps it in the work space as uncommitted changes. Then: run the tests, and **Review and commit changes**.
+
+Explaining a rule: read its condition cells left to right as "when … and …", its results as "it gives …"; `-` means any value. Say what the hit policy does when several rules match.
